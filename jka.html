@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard SPI — JKA</title>
+<style>
+:root{
+  color-scheme: light;
+  --page-bg: #eef1f4;
+  --grid-line: rgba(42,120,214,0.055);
+  --surface-1: #fcfcfb;
+  --surface-2: #f5f6f4;
+  --surface-3: #ebeeec;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --hairline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --accent: #2a78d6;
+  --status-good: #0ca30c;
+  --status-good-wash: rgba(12,163,12,0.08);
+  --status-warning-mark: #fab219;
+  --status-warning-text: #8a5a00;
+  --status-warning-wash: rgba(250,178,25,0.16);
+  --status-critical: #d03b3b;
+  --status-critical-wash: rgba(208,59,59,0.07);
+  --focus-ring: #2a78d6;
+  --shadow: 0 1px 2px rgba(11,11,11,0.04), 0 8px 24px -12px rgba(11,11,11,0.14);
+  --overlay: rgba(15,18,22,0.42);
+  --tooltip-bg: #1a1a19;
+  --tooltip-text: #ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page-bg: #0a0e13;
+    --grid-line: rgba(57,135,229,0.07);
+    --surface-1: #1a1a19;
+    --surface-2: #15181c;
+    --surface-3: #20242a;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8b8a84;
+    --hairline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --status-good: #0ca30c;
+    --status-good-wash: rgba(12,163,12,0.10);
+    --status-warning-mark: #fab219;
+    --status-warning-text: #f2c46a;
+    --status-warning-wash: rgba(250,178,25,0.14);
+    --status-critical: #d03b3b;
+    --status-critical-wash: rgba(208,59,59,0.10);
+    --focus-ring: #3987e5;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -12px rgba(0,0,0,0.6);
+    --overlay: rgba(0,0,0,0.6);
+    --tooltip-bg: #fcfcfb;
+    --tooltip-text: #0b0b0b;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page-bg: #0a0e13;
+  --grid-line: rgba(57,135,229,0.07);
+  --surface-1: #1a1a19;
+  --surface-2: #15181c;
+  --surface-3: #20242a;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8b8a84;
+  --hairline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255,255,255,0.10);
+  --accent: #3987e5;
+  --status-good: #0ca30c;
+  --status-good-wash: rgba(12,163,12,0.10);
+  --status-warning-mark: #fab219;
+  --status-warning-text: #f2c46a;
+  --status-warning-wash: rgba(250,178,25,0.14);
+  --status-critical: #d03b3b;
+  --status-critical-wash: rgba(208,59,59,0.10);
+  --focus-ring: #3987e5;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 28px -12px rgba(0,0,0,0.6);
+  --overlay: rgba(0,0,0,0.6);
+  --tooltip-bg: #fcfcfb;
+  --tooltip-text: #0b0b0b;
+}
+
+*{ box-sizing: border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background: var(--page-bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+@media (prefers-reduced-motion: no-preference){
+  .fade-in{ animation: fadeIn .5s ease both; }
+  .fade-in.d1{ animation-delay: .05s; }
+  .fade-in.d2{ animation-delay: .1s; }
+  .fade-in.d3{ animation-delay: .15s; }
+  @keyframes fadeIn{ from{ opacity:0; transform: translateY(6px);} to{ opacity:1; transform:none; } }
+}
+
+.wrap{ max-width: 1180px; margin: 0 auto; padding: 28px 24px 64px; }
+
+h1{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 700;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 6px 0 8px;
+  text-wrap: balance;
+}
+.lede{
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.55;
+  max-width: 62ch;
+  margin: 0;
+}
+
+header.top{
+  display:flex; align-items:flex-start; justify-content: space-between; gap: 24px;
+  padding-bottom: 18px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--hairline);
+  flex-wrap: wrap;
+}
+.id-block{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11.5px; color: var(--text-muted); text-align:right; line-height:1.7; white-space:nowrap; padding-top:4px;}
+.id-block b{ color: var(--text-secondary); font-weight:600; }
+.header-side{ display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+.header-side-row{ display:flex; gap:8px; }
+.header-side-row[hidden]{ display:none; }
+
+
+/* filter row */
+.filters{
+  display:flex; align-items:center; gap: 22px; flex-wrap: wrap;
+  padding: 14px 18px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  margin-bottom: 22px;
+}
+.filter-group{ display:flex; align-items:center; gap:10px; }
+.filter-group[hidden]{ display:none; }
+.filter-label{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight:600; text-transform:uppercase; letter-spacing:.08em;
+  font-size:11.5px; color: var(--text-muted);
+}
+select.wk{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:13px; font-weight:500;
+  color: var(--text-primary); background: var(--surface-2);
+  border:1px solid var(--border); border-radius:6px; padding:6px 10px;
+  cursor:pointer;
+}
+select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+.pillset{ display:flex; gap:6px; }
+.pillset[hidden]{ display:none; }
+.pill{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 13px; font-weight:600;
+  padding: 6px 13px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text-secondary); cursor:pointer;
+  display:flex; align-items:center; gap:7px;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.pill:hover{ background: var(--surface-1); }
+.pill:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+.pill .dot{ width:8px; height:8px; border-radius:50%; background: currentColor; opacity:.55; }
+.pill[aria-pressed="true"]{ color: var(--text-primary); border-color: currentColor; }
+.pill[aria-pressed="true"].all{ background: var(--surface-2); color: var(--text-primary); border-color: var(--text-muted); }
+.pill[aria-pressed="true"] .dot{ opacity:1; }
+
+/* KPI row */
+.kpis{ display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+.kpi{
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px 18px; box-shadow: var(--shadow);
+}
+.kpi .label{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; text-transform:uppercase;
+  letter-spacing:.07em; font-size: 11.5px; color: var(--text-muted); margin-bottom:8px;
+}
+.kpi .value{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; font-size: 28px; color: var(--text-primary);
+  line-height:1;
+}
+.kpi .value.good{ color: var(--status-good); }
+.kpi .value.warn{ color: var(--status-warning-text); }
+.kpi .value.crit{ color: var(--status-critical); }
+.kpi .sub{ font-size: 12.5px; color: var(--text-secondary); margin-top:6px; }
+
+/* chart card */
+.card{
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow); padding: 22px 22px 10px; margin-bottom: 22px;
+}
+.card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom: 4px; }
+.card-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size: 19px; letter-spacing:-0.005em; }
+.card-note{ font-size: 12.5px; color: var(--text-muted); }
+.legend{ display:flex; gap:18px; align-items:center; margin: 6px 0 4px; flex-wrap:wrap; }
+.legend-item{ display:flex; align-items:center; gap:7px; font-size:13px; color: var(--text-secondary); font-weight:500; }
+.legend-swatch{ width:10px; height:10px; border-radius:50%; flex:none; }
+.legend-line{ width:22px; height:0; border-top: 2px dashed var(--text-muted); flex:none; }
+
+.project-pick{ cursor:pointer; }
+.project-pick:hover{ text-decoration: underline; text-decoration-color: var(--accent); }
+.project-pick:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; border-radius:3px; }
+tr.row-isolated td{ background: var(--surface-2); }
+tr.row-isolated .project-pick{ color: var(--accent); font-weight:600; }
+.project-pick[aria-pressed="true"]{ color: var(--accent); font-weight:600; }
+
+.chart-shell{ position: relative; width:100%; }
+svg.chart{ width:100%; height:auto; display:block; overflow: visible; }
+.axis-label{ fill: var(--text-muted); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:10px; }
+.tick-label{ fill: var(--text-muted); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:9px; }
+.gridline{ stroke: var(--hairline); stroke-width:1; }
+.baseline{ stroke: var(--baseline); stroke-width:1; }
+.spi-target{ stroke: var(--text-muted); stroke-width:1.5; stroke-dasharray: 3 4; }
+.spi-target-label{ fill: var(--text-secondary); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:9px; font-weight:500; }
+.direct-label{ fill: var(--text-secondary); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:8px; font-weight:500; pointer-events:none; }
+.label-leader{ stroke: var(--text-muted); stroke-width:.75; opacity:.5; pointer-events:none; }
+.band-good{ fill: var(--status-good-wash); }
+.band-warn{ fill: var(--status-warning-wash); }
+.band-crit{ fill: var(--status-critical-wash); }
+.trend-line{ fill:none; stroke: var(--text-secondary); stroke-width:2; opacity:.55; }
+.trend-point-label{ fill: var(--text-secondary); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:9px; font-weight:600; }
+
+.dot-hit{ fill: transparent; cursor: pointer; }
+.dot-mark{ stroke: var(--surface-1); stroke-width: 2; transition: r .1s ease; pointer-events:none; }
+.dot-hit:hover + .dot-mark, .dot-hit:focus-visible + .dot-mark{ r: 7; }
+
+/* histórico de SPI por semana de TODOS os projetos de uma empresa — uma
+   linha por projeto, seja sobrepostas no mesmo gráfico (.proj-group, com
+   destaque via hover) ou uma mini-linha por card na visão em grade (sem
+   agrupamento .proj-group, por isso as regras base ficam sem esse prefixo). */
+.spi-line{ fill:none; stroke-width:2; }
+.spi-dot{ stroke: var(--surface-1); stroke-width:2; }
+.proj-group .spi-line{ opacity:.6; transition: opacity .15s ease, stroke-width .15s ease; }
+.proj-group .spi-hit{ fill:none; stroke: transparent; stroke-width:14; cursor:pointer; }
+.proj-group .spi-hit:focus-visible{ outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.proj-group .spi-dot{ transition: opacity .15s ease, r .12s ease; }
+.proj-group.dim .spi-line{ opacity: .08; }
+.proj-group.dim .spi-dot{ opacity: .2; }
+.proj-group.emph .spi-line{ opacity: 1; stroke-width: 3; }
+.proj-group.emph .spi-dot{ r: 6.5; }
+
+.chart-head-actions{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+
+/* histórico por empresa em grade (small multiples) — uma mini-linha por
+   projeto, lado a lado, para comparar sem as linhas se sobreporem. */
+.company-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; padding: 6px 0 16px; }
+.company-grid[hidden]{ display:none; }
+.grid-card{
+  border:1px solid var(--border); border-radius:10px; padding:10px 12px 8px;
+  background: var(--surface-2); cursor:pointer; text-align:left;
+  transition: border-color .12s ease, background .12s ease;
+}
+.grid-card:hover{ border-color: var(--accent); background: var(--surface-3); }
+.grid-card:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; }
+.grid-card-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:4px; }
+.grid-card-name{ font-size:12.5px; font-weight:600; color: var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.grid-card-spi{ font-size:12.5px; font-weight:700; font-variant-numeric: tabular-nums; flex:none; }
+.grid-card-spi.good{ color: var(--status-good); }
+.grid-card-spi.warn{ color: var(--status-warning-text); }
+.grid-card-spi.crit{ color: var(--status-critical); }
+.grid-card-svg{ width:100%; height:auto; display:block; }
+.grid-card-foot{ font-size:10.5px; color: var(--text-muted); margin-top:4px; }
+.grid-empty{ grid-column: 1 / -1; text-align:center; color: var(--text-muted); padding: 28px; font-size:13.5px; }
+.dot-hit:focus-visible{ outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.tooltip{
+  position: absolute; pointer-events:none; z-index: 5;
+  background: var(--tooltip-bg); color: var(--tooltip-text); border-radius: 8px;
+  box-shadow: var(--shadow); padding: 10px 12px; min-width: 190px;
+  font-size: 12.5px; opacity:0; transform: translate(-50%, calc(-100% - 14px)); transition: opacity .1s ease;
+}
+.tooltip.show{ opacity:1; }
+.tooltip .t-name{ font-weight:700; color: var(--tooltip-text); font-size:13px; margin-bottom:2px; }
+.tooltip .t-sub{ color: var(--tooltip-text); opacity:.65; font-size:11.5px; margin-bottom:8px; }
+.tooltip .t-row{ display:flex; justify-content:space-between; gap: 14px; padding: 2px 0; }
+.tooltip .t-key{ color: var(--tooltip-text); opacity:.75; display:flex; align-items:center; gap:6px; }
+.tooltip .t-key .key-line{ width:12px; height:2px; background: currentColor; }
+.tooltip .t-val{ font-weight:600; color: var(--tooltip-text); }
+.tooltip .tooltip-email-btn{
+  pointer-events:auto; margin-top:9px; width:100%; justify-content:center;
+  font-size:12px; padding:7px 10px; border-radius:6px;
+  background: var(--accent); border:1px solid var(--accent); color:#fff; cursor:pointer;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600;
+}
+.tooltip .tooltip-email-btn:hover{ filter: brightness(1.06); }
+
+/* buttons */
+.btn{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:13px; font-weight:600;
+  padding: 8px 15px; border-radius:7px; border:1px solid var(--border);
+  background: var(--surface-2); color: var(--text-primary); cursor:pointer;
+  display:inline-flex; align-items:center; gap:7px; line-height:1.2;
+  transition: background .12s ease, border-color .12s ease, opacity .12s ease;
+}
+.btn[hidden]{ display:none; }
+.btn:hover{ background: var(--surface-3); }
+.btn:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; }
+.btn:disabled{ opacity:.5; cursor:not-allowed; }
+.btn.primary{ background: var(--accent); border-color: var(--accent); color:#fff; }
+.btn.primary:hover{ filter: brightness(1.06); }
+.btn.ghost{ background: transparent; }
+.btn.small{ padding: 5px 10px; font-size:12px; border-radius:6px; }
+.btn.danger-outline{ background: transparent; border-color: var(--status-critical); color: var(--status-critical); }
+.btn.danger-outline:hover{ background: var(--status-critical-wash); }
+.btn.danger{ background: var(--status-critical); border-color: var(--status-critical); color:#fff; }
+
+/* table */
+.table-card{
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.table-head{ padding: 18px 22px 12px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.table-head-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.table-head-actions[hidden]{ display:none; }
+.table-scroll{ overflow-x: auto; }
+table{ width:100%; border-collapse: collapse; min-width: 820px; }
+thead th{
+  text-align:left; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; text-transform:uppercase;
+  letter-spacing:.06em; font-size: 11.5px; color: var(--text-muted);
+  padding: 9px 22px; border-bottom: 1px solid var(--hairline); border-top: 1px solid var(--hairline);
+  background: var(--surface-2); position: sticky; top:0;
+  white-space:nowrap;
+}
+thead th[data-key]{ cursor: pointer; user-select:none; }
+thead th[data-key]:hover{ color: var(--text-secondary); }
+thead th .arrow{ font-size:9px; margin-left:4px; opacity:.6; }
+tbody td{ padding: 9px 22px; border-bottom: 1px solid var(--hairline); font-size: 13.5px; color: var(--text-primary); white-space:nowrap; }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover td{ background: var(--surface-2); }
+td.num, th.num{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; text-align:right; font-variant-numeric: tabular-nums; }
+tbody tr.clickable{ cursor:pointer; }
+.status-pill{
+  display:inline-flex; align-items:center; gap:6px; padding: 3px 9px; border-radius:999px;
+  font-size:11.5px; font-weight:600; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.status-pill.good{ background: var(--status-good-wash); color: var(--status-good); }
+.status-pill.warn{ background: var(--status-warning-wash); color: var(--status-warning-text); }
+.status-pill.crit{ background: var(--status-critical-wash); color: var(--status-critical); }
+.empty-row td{ text-align:center; color: var(--text-muted); padding: 28px; font-size:13.5px; }
+
+/* breakdown cards (SPI por faixa / por empresa) */
+.breakdown-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px; }
+.breakdown-grid.single-col{ grid-template-columns: 1fr; }
+.breakdown-card{ padding-bottom: 8px; }
+table.mini-table{ width:100%; min-width:0; border-collapse: collapse; }
+table.mini-table thead th{ position: static; padding: 8px 4px; }
+table.mini-table tbody td{ padding: 8px 4px; font-size: 13.5px; white-space: normal; }
+table.mini-table tbody tr:last-child td{ border-bottom:none; }
+table.mini-table tbody tr:hover td{ background: transparent; }
+.bd-val{ font-weight:600; }
+.bd-val.good{ color: var(--status-good); }
+.bd-val.warn{ color: var(--status-warning-text); }
+.bd-val.crit{ color: var(--status-critical); }
+.bd-empty{ text-align:center; color: var(--text-muted); padding: 16px 4px; }
+
+/* exclude-project action + management modal */
+.btn.exclude-row{ padding: 4px 9px; font-size:11.5px; }
+.excluded-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--hairline); }
+.excluded-row:last-child{ border-bottom:none; }
+.excluded-row .excluded-name{ font-size:13.5px; color: var(--text-primary); }
+.excluded-empty{ padding: 20px 0; color: var(--text-muted); font-size:13.5px; text-align:center; }
+
+/* modal */
+.modal-overlay{
+  position: fixed; inset:0; background: var(--overlay); display:flex; align-items:flex-start; justify-content:center;
+  padding: 40px 18px; overflow-y:auto; z-index: 50;
+}
+.modal-overlay[hidden]{ display:none; }
+
+.confirm-overlay{
+  position: fixed; inset:0; background: var(--overlay); display:flex; align-items:center; justify-content:center;
+  padding: 18px; z-index: 60;
+}
+.confirm-overlay[hidden]{ display:none; }
+.confirm-box{
+  background: var(--surface-1); border:1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+  width: 100%; max-width: 380px; padding: 22px 24px;
+}
+.confirm-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:17px; margin-bottom:8px; }
+.confirm-text{ font-size:13.5px; color: var(--text-secondary); margin: 0 0 20px; line-height:1.45; }
+.confirm-actions{ display:flex; justify-content:flex-end; gap:10px; }
+.modal{
+  background: var(--surface-1); border:1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
+  width: 100%; max-width: 560px; padding: 24px 26px 22px;
+}
+.modal-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 4px; }
+.modal-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size: 20px; }
+.modal-close{ background:none; border:none; color: var(--text-muted); font-size:20px; cursor:pointer; line-height:1; padding:4px; }
+.modal-close:hover{ color: var(--text-primary); }
+.modal-sub{ font-size:12.5px; color: var(--text-muted); margin: 0 0 18px; }
+.form-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.form-field{ display:flex; flex-direction:column; gap:6px; }
+.form-field.span2{ grid-column: 1 / -1; }
+.form-field label{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+  font-size:11px; color: var(--text-muted);
+}
+.form-field input{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:14px; color: var(--text-primary);
+  background: var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px;
+  width:100%;
+}
+.form-field input:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+.form-hint{ font-size:11px; color: var(--text-muted); }
+.form-preview{
+  grid-column: 1/-1; display:flex; gap:22px; flex-wrap:wrap; padding:12px 14px; border-radius:9px;
+  background: var(--surface-2); border:1px solid var(--border); margin-top:2px;
+}
+.form-preview .fp-item{ display:flex; flex-direction:column; gap:2px; }
+.form-preview .fp-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color: var(--text-muted); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; }
+.form-preview .fp-value{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; font-size:15px; }
+.modal-actions{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top: 20px; flex-wrap:wrap; }
+.modal-actions-left{ display:flex; gap:10px; flex-wrap:wrap; }
+.modal-actions-right{ display:flex; gap:10px; }
+.form-error{ grid-column:1/-1; font-size:12.5px; color: var(--status-critical); display:none; }
+.form-error.show{ display:block; }
+
+/* relatório semanal */
+.modal.report-modal{ max-width: 760px; }
+.report-summary{ border-radius:10px; padding:14px 16px; margin: 4px 0 16px; border:1px solid var(--border); background: var(--surface-2); }
+.report-summary.good{ border-color: var(--status-good); background: var(--status-good-wash, var(--surface-2)); }
+.report-summary.crit{ border-color: var(--status-critical); background: var(--status-critical-wash, var(--surface-2)); }
+.report-summary-headline{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:15px; margin-bottom:4px; }
+.report-summary.good .report-summary-headline{ color: var(--status-good); }
+.report-summary.crit .report-summary-headline{ color: var(--status-critical); }
+.report-summary-sub{ font-size:12.5px; color: var(--text-secondary); }
+.report-kpis{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+.report-kpi{
+  flex:1; min-width:140px; display:flex; flex-direction:column; gap:4px; padding:10px 14px;
+  border-radius:9px; background: var(--surface-2); border:1px solid var(--border);
+}
+.report-kpi-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color: var(--text-muted); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; }
+.report-kpi-value{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:18px; }
+.report-kpi-value.good{ color: var(--status-good); }
+.report-kpi-value.crit{ color: var(--status-critical); }
+.report-columns{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-bottom: 8px; }
+.report-col-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:13px; margin-bottom:8px; }
+.report-col-title.good{ color: var(--status-good); }
+.report-col-title.crit{ color: var(--status-critical); }
+.report-list{ max-height: 260px; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+.report-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--hairline); font-size:12.5px; }
+.report-row:last-child{ border-bottom:none; }
+.report-row-name{ color: var(--text-primary); }
+.report-row-vals{ white-space:nowrap; color: var(--text-secondary); }
+.report-arrow{ color: var(--text-muted); }
+.report-delta.good{ color: var(--status-good); font-weight:600; }
+.report-delta.crit{ color: var(--status-critical); font-weight:600; }
+.report-empty{ font-size:12.5px; color: var(--text-muted); }
+
+/* toast */
+.toast-stack{ position: fixed; bottom: 20px; right: 20px; display:flex; flex-direction:column; gap:8px; z-index: 60; }
+.toast{
+  background: var(--surface-1); border:1px solid var(--border); border-radius:9px; box-shadow: var(--shadow);
+  padding: 11px 15px; font-size:13px; color: var(--text-primary); max-width:320px;
+  display:flex; align-items:flex-start; gap:9px;
+}
+.toast .t-dot{ width:8px; height:8px; border-radius:50%; margin-top:4px; flex:none; background: var(--status-good); }
+.toast.error .t-dot{ background: var(--status-critical); }
+.toast.warn .t-dot{ background: var(--status-warning-text); }
+
+footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-align:center; }
+
+/* login */
+.login-screen{
+  position: fixed; inset:0; z-index: 100; display:flex; align-items:center; justify-content:center;
+  padding: 18px;
+  background: var(--page-bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+.login-screen[hidden]{ display:none; }
+.login-card{
+  width:100%; max-width: 360px; background: var(--surface-1); border:1px solid var(--border); border-radius: 14px;
+  box-shadow: var(--shadow); padding: 32px 30px 28px;
+}
+.login-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:22px; margin:0 0 6px; letter-spacing:-0.01em; }
+.login-sub{ color: var(--text-secondary); font-size:13.5px; margin:0 0 22px; line-height:1.5; }
+.login-field{ display:flex; flex-direction:column; gap:6px; }
+.login-field + .login-field{ margin-top:14px; }
+.login-field label{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+  font-size:11px; color: var(--text-muted);
+}
+.login-field select, .login-field input{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:14px; color: var(--text-primary);
+  background: var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:9px 10px; width:100%;
+}
+.login-field select:focus-visible, .login-field input:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+.login-card .btn.primary{ width:100%; justify-content:center; margin-top:20px; }
+.login-card .form-error{ margin-top:12px; }
+.logged-in-as{ font-size:11.5px; color: var(--text-muted); align-self:center; white-space:nowrap; }
+
+@media (max-width: 720px){
+  .kpis{ grid-template-columns: repeat(2,1fr); }
+  .id-block{ display:none; }
+  .filters{ flex-direction:column; align-items:flex-start; }
+  .form-grid{ grid-template-columns: 1fr; }
+  .breakdown-grid{ grid-template-columns: 1fr; }
+  .report-columns{ grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="login-screen" id="loginScreen">
+  <div class="login-card fade-in">
+    <h1 class="login-title">Dashboard SPI</h1>
+    <p class="login-sub">Entre com seu nome e senha para acessar o painel.</p>
+    <form id="loginForm" novalidate>
+      <div class="login-field">
+        <label for="loginUser">Nome</label>
+        <select id="loginUser"></select>
+      </div>
+      <div class="login-field">
+        <label for="loginPassword">Senha</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </div>
+      <div class="form-error" id="loginError"></div>
+      <button type="submit" class="btn primary">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<div class="wrap" id="dashWrap" hidden>
+
+  <header class="top fade-in">
+    <div>
+      <h1>SPI &times; % Concluído por Projeto</h1>
+      <p class="lede">Índice de desempenho de prazo (SPI) contra o percentual físico concluído em cada obra ativa. Pontos abaixo da linha tracejada estão atrasados em relação ao planejado.</p>
+    </div>
+    <div class="header-side">
+      <div class="header-side-row" id="adminToolbarTop">
+        <button type="button" class="btn ghost small" id="btnExportData" title="Baixa um arquivo com todos os lançamentos atuais">Exportar dados</button>
+        <button type="button" class="btn ghost small" id="btnImportData" title="Carrega lançamentos de um arquivo exportado anteriormente">Importar dados</button>
+        <input type="file" id="importFileInput" accept="application/json" hidden>
+        <button type="button" class="btn ghost small" id="btnManageExcluded" title="Projetos removidos do gráfico, da tabela e dos indicadores">Projetos excluídos</button>
+        <button type="button" class="btn ghost small" id="btnWeeklyReport" title="Compara a semana selecionada com a semana anterior">Relatório semanal</button>
+      </div>
+      <div class="header-side-row" id="headerAuthRow">
+        <span class="logged-in-as" id="loggedInAs"></span>
+        <button type="button" class="btn ghost small" id="btnChangePassword">Alterar senha</button>
+        <button type="button" class="btn ghost small" id="btnLogout">Sair</button>
+      </div>
+      <button type="button" class="btn ghost small" id="themeToggle" aria-label="Alternar tema claro/escuro">Modo escuro</button>
+      <div class="id-block">
+        <span id="id-company-line" hidden><b id="id-company-name"></b><br></span>
+        PAINEL <b id="id-block-label">lançamento direto</b><br>
+        PROJETOS <b id="id-count">&mdash;</b> &nbsp;&middot;&nbsp; SEMANA <b id="id-week">&mdash;</b>
+      </div>
+    </div>
+  </header>
+
+  <div class="filters fade-in d1">
+    <div class="filter-group">
+      <span class="filter-label">Semana</span>
+      <select id="weekSelect" class="wk"></select>
+      <button type="button" class="btn ghost small" id="btnAdvanceWeek" title="Copia os projetos da semana atual para a próxima semana">Avançar semana →</button>
+      <button type="button" class="btn small danger-outline" id="btnDeleteWeek" title="Remove todos os lançamentos da semana selecionada (use se ela foi incluída por engano)">Excluir semana</button>
+    </div>
+    <div class="filter-group" id="companyFilterGroup">
+      <span class="filter-label">Empresa</span>
+      <div class="pillset" id="companyPills"></div>
+    </div>
+    <div class="filter-group">
+      <span class="filter-label">Escopo</span>
+      <div class="pillset" id="scopePills"></div>
+    </div>
+  </div>
+
+  <div class="kpis fade-in d1">
+    <div class="kpi">
+      <div class="label">SPI Global</div>
+      <div class="value" id="kpiAvgSpi">&mdash;</div>
+      <div class="sub" id="kpiAvgSpiSub">na seleção atual</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Bom (SPI &gt; 1,00)</div>
+      <div class="value good" id="kpiGood">&mdash;</div>
+      <div class="sub" id="kpiGoodSub">&nbsp;</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Atenção (0,85&ndash;1,00)</div>
+      <div class="value warn" id="kpiWarn">&mdash;</div>
+      <div class="sub" id="kpiWarnSub">&nbsp;</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Crítico (SPI &lt; 0,85)</div>
+      <div class="value crit" id="kpiCrit">&mdash;</div>
+      <div class="sub" id="kpiCritSub">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="card fade-in d2">
+    <div class="card-head">
+      <div>
+        <div class="card-title" id="chartCardTitle">Dispersão &mdash; SPI por % físico concluído</div>
+        <div class="card-note" id="chartCardNote">cada ponto = um projeto na semana selecionada. Clique em um ponto para ver o histórico de SPI por semana.</div>
+      </div>
+      <div class="chart-head-actions">
+        <div class="pillset" id="companyStatusPills" hidden>
+          <button type="button" class="pill" data-status="good" aria-pressed="true" style="color:var(--status-good)"><span class="dot"></span>Bom</button>
+          <button type="button" class="pill" data-status="warn" aria-pressed="true" style="color:var(--status-warning-text)"><span class="dot"></span>Atenção</button>
+          <button type="button" class="pill" data-status="crit" aria-pressed="true" style="color:var(--status-critical)"><span class="dot"></span>Crítico</button>
+        </div>
+        <button type="button" class="btn ghost small" id="btnCompanyGridToggle">Ver em grade</button>
+        <button type="button" class="btn ghost small" id="btnBackToScatter" hidden>&larr; Ver todos os projetos</button>
+      </div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="chart-shell" id="chartShell">
+      <svg class="chart" id="chart" viewBox="0 0 920 460" role="img" aria-label="Gráfico de dispersão de SPI por percentual concluído, por projeto"></svg>
+      <div class="tooltip" id="tooltip" role="tooltip"></div>
+    </div>
+    <div class="company-grid" id="companyGrid" hidden></div>
+  </div>
+
+  <div class="breakdown-grid fade-in d2">
+    <div class="card breakdown-card">
+      <div class="card-head">
+        <div class="card-title">SPI por % físico concluído</div>
+        <div class="card-note">na seleção atual</div>
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>Faixa</th><th class="num">Projetos</th><th class="num">SPI</th></tr></thead>
+        <tbody id="bandBreakdownBody"></tbody>
+      </table>
+    </div>
+    <div class="card breakdown-card" id="companyBreakdownCard">
+      <div class="card-head">
+        <div class="card-title">SPI por empresa</div>
+        <div class="card-note">na seleção atual</div>
+      </div>
+      <table class="mini-table">
+        <thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI</th></tr></thead>
+        <tbody id="companyBreakdownBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="table-card fade-in d3">
+    <div class="table-head">
+      <div>
+        <div class="card-title">Projetos &mdash; semana selecionada</div>
+        <div class="card-note" id="tableNote">clique no cabeçalho para ordenar &middot; clique no nome do projeto para isolar no gráfico &middot; clique no restante da linha para editar &middot; "Excluir projeto" remove de todas as semanas até você reincluir</div>
+      </div>
+      <div class="table-head-actions" id="tableHeadActions">
+        <button type="button" class="btn ghost small" id="btnEmailHead" disabled title="Clique no nome de um projeto na tabela para selecioná-lo">Enviar e-mail ao PM</button>
+        <button type="button" class="btn primary small" id="btnAdd">+ Novo lançamento</button>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th data-key="project">Projeto</th>
+            <th data-key="company">Empresa</th>
+            <th data-key="scope">Escopo</th>
+            <th class="num" data-key="pct_complete">% Concl.</th>
+            <th class="num" data-key="spi">SPI</th>
+            <th data-key="status">Status</th>
+            <th id="thActions">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle">New entry</div>
+      <button type="button" class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+    </div>
+    <p class="modal-sub">Fill in this project's data for the week. SPI and band are calculated automatically.</p>
+    <form id="entryForm" novalidate>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="fCode">Project code</label>
+          <input type="text" id="fCode" name="code" list="projectCodeList" required autocomplete="off" placeholder="e.g. 240201 or S240201">
+        </div>
+        <div class="form-field">
+          <label for="fProject">Project</label>
+          <input type="text" id="fProject" name="project" list="projectList" required autocomplete="off" placeholder="e.g. Mary Ellen">
+        </div>
+        <div class="form-field">
+          <label for="fCompany">Company</label>
+          <input type="text" id="fCompany" name="company" list="companyList" required autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="fScope">Scope</label>
+          <input type="text" id="fScope" name="scope" list="scopeList" required autocomplete="off">
+        </div>
+        <div class="form-field">
+          <label for="fWeek">Week</label>
+          <input type="week" id="fWeek" name="week" required>
+          <span class="form-hint">Format YYYY-Www (e.g. 2026-W35)</span>
+        </div>
+        <div class="form-field">
+          <label for="fCr">Change requests</label>
+          <input type="number" id="fCr" name="cr" min="0" step="1" value="0">
+        </div>
+        <div class="form-field">
+          <label for="fBaseline">Baseline duration (days)</label>
+          <input type="number" id="fBaseline" name="baseline_duration" min="0" step="0.1" required>
+        </div>
+        <div class="form-field">
+          <label for="fVariance">Finish variance (days)</label>
+          <input type="number" id="fVariance" name="finish_variance" step="0.1" value="0">
+        </div>
+        <div class="form-field span2">
+          <label for="fPct">% physical complete</label>
+          <input type="number" id="fPct" name="pct_complete" min="0" max="100" step="1" required>
+        </div>
+        <div class="form-field span2">
+          <label for="fPmEmail">PM email (optional)</label>
+          <input type="email" id="fPmEmail" name="pm_email" autocomplete="off" placeholder="pm@company.com">
+          <span class="form-hint">Used by the "Enviar e-mail ao PM" button next to "+ Novo lançamento".</span>
+        </div>
+        <div class="form-error" id="formError"></div>
+        <div class="form-preview">
+          <div class="fp-item"><span class="fp-label">Scheduled duration</span><span class="fp-value" id="prevSched">&mdash;</span></div>
+          <div class="fp-item"><span class="fp-label">Calculated SPI</span><span class="fp-value" id="prevSpi">&mdash;</span></div>
+          <div class="fp-item"><span class="fp-label">Band</span><span class="fp-value" id="prevBand">&mdash;</span></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn danger-outline" id="btnDelete" hidden>Excluir lançamento</button>
+        <div class="modal-actions-right">
+          <button type="button" class="btn ghost" id="btnCancel">Cancelar</button>
+          <button type="submit" class="btn primary" id="btnSave">Salvar lançamento</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal-overlay" id="passwordOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="passwordTitle" style="max-width:420px;">
+    <div class="modal-head">
+      <div class="modal-title" id="passwordTitle">Alterar senha</div>
+      <button type="button" class="modal-close" id="passwordClose" aria-label="Fechar">&times;</button>
+    </div>
+    <p class="modal-sub">Alterando a senha de <b id="passwordForUser">—</b>.</p>
+    <form id="passwordForm" novalidate>
+      <div class="form-grid">
+        <div class="form-field span2">
+          <label for="pwCurrent">Senha atual</label>
+          <input type="password" id="pwCurrent" required autocomplete="current-password">
+        </div>
+        <div class="form-field span2">
+          <label for="pwNew">Nova senha</label>
+          <input type="password" id="pwNew" required autocomplete="new-password" minlength="4">
+        </div>
+        <div class="form-field span2">
+          <label for="pwConfirm">Confirmar nova senha</label>
+          <input type="password" id="pwConfirm" required autocomplete="new-password" minlength="4">
+        </div>
+        <div class="form-error" id="passwordError"></div>
+      </div>
+      <div class="modal-actions">
+        <div></div>
+        <div class="modal-actions-right">
+          <button type="button" class="btn ghost" id="pwCancel">Cancelar</button>
+          <button type="submit" class="btn primary">Salvar nova senha</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="advanceConfirmOverlay" hidden>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="advanceConfirmTitle">
+    <div class="confirm-title" id="advanceConfirmTitle">Avançar para a próxima semana?</div>
+    <p class="confirm-text" id="advanceConfirmText"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost" id="advanceConfirmNo">Cancelar</button>
+      <button type="button" class="btn primary" id="advanceConfirmYes">Sim, avançar</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="deleteWeekConfirmOverlay" hidden>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="deleteWeekConfirmTitle">
+    <div class="confirm-title" id="deleteWeekConfirmTitle">Excluir semana inteira?</div>
+    <p class="confirm-text" id="deleteWeekConfirmText"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost" id="deleteWeekConfirmNo">Cancelar</button>
+      <button type="button" class="btn danger" id="deleteWeekConfirmYes">Sim, excluir semana</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="excludeConfirmOverlay" hidden>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="excludeConfirmTitle">
+    <div class="confirm-title" id="excludeConfirmTitle">Excluir projeto do painel?</div>
+    <p class="confirm-text" id="excludeConfirmText"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost" id="excludeConfirmNo">Cancelar</button>
+      <button type="button" class="btn danger" id="excludeConfirmYes">Sim, excluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="emailConfirmOverlay" hidden>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="emailConfirmTitle">
+    <div class="confirm-title" id="emailConfirmTitle">Enviar e-mail ao PM?</div>
+    <p class="confirm-text" id="emailConfirmText"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost" id="emailConfirmNo">Não</button>
+      <button type="button" class="btn primary" id="emailConfirmYes">Sim, gerar e-mail</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="reportOverlay" hidden>
+  <div class="modal report-modal" role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+    <div class="modal-head">
+      <div class="modal-title" id="reportTitle">Relatório semanal — SPI</div>
+      <button type="button" class="modal-close" id="reportClose" aria-label="Fechar">&times;</button>
+    </div>
+    <p class="modal-sub" id="reportSub"></p>
+    <div class="report-summary" id="reportSummary"></div>
+    <div class="report-kpis">
+      <div class="report-kpi">
+        <span class="report-kpi-label">SPI semana anterior</span>
+        <span class="report-kpi-value" id="reportKpiPrev">—</span>
+      </div>
+      <div class="report-kpi">
+        <span class="report-kpi-label">SPI semana atual</span>
+        <span class="report-kpi-value" id="reportKpiCur">—</span>
+      </div>
+      <div class="report-kpi">
+        <span class="report-kpi-label">Variação</span>
+        <span class="report-kpi-value" id="reportKpiDelta">—</span>
+      </div>
+    </div>
+    <div class="report-columns">
+      <div>
+        <div class="report-col-title good" id="reportImprovedTitle">Melhoraram (0)</div>
+        <div class="report-list" id="reportImprovedList"></div>
+      </div>
+      <div>
+        <div class="report-col-title crit" id="reportWorsenedTitle">Pioraram (0)</div>
+        <div class="report-list" id="reportWorsenedList"></div>
+      </div>
+    </div>
+    <p class="modal-sub" id="reportNotes" hidden></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost" id="reportCloseBtn">Fechar</button>
+      <button type="button" class="btn primary" id="btnExportReport" title="Baixa este relatório em uma planilha Excel (.xlsx)">Exportar relatório (Excel)</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="excludedOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="excludedTitle">
+    <div class="modal-head">
+      <div class="modal-title" id="excludedTitle">Projetos excluídos</div>
+      <button type="button" class="modal-close" id="excludedClose" aria-label="Fechar">&times;</button>
+    </div>
+    <p class="modal-sub">Removidos do gráfico, da tabela e dos indicadores em todas as semanas. Clique em "Reincluir" para trazer um projeto de volta.</p>
+    <div id="excludedList"></div>
+  </div>
+</div>
+
+<datalist id="companyList"></datalist>
+<datalist id="scopeList"></datalist>
+<datalist id="projectList"></datalist>
+<datalist id="projectCodeList"></datalist>
+
+<div class="toast-stack" id="toastStack"></div>
+
+
+<script>window.SPI_FORCED_VIEW = 'JKA';</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
