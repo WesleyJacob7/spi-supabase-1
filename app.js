@@ -1,6 +1,26 @@
 
 "use strict";
 
+/* ---------- configuração do e-mail de acompanhamento de SPI ----------
+   Ajuste os valores abaixo conforme necessário — nenhum outro trecho do
+   arquivo precisa ser tocado para mudar cópias (CC) ou links. */
+
+// Endereços que sempre entram em cópia (CC), independente da empresa do projeto.
+var EMAIL_CC_ALWAYS = ['mcagnim@avalonhomes.com.br', 'planejamento@avalonhomes.com.br'];
+
+// Endereço adicional de CC, de acordo com a empresa do projeto (d.company).
+var EMAIL_CC_BY_COMPANY = {
+  'JKA': 'lmauler@jkaconstructioninc.com',
+  'Prestige': 'mramos@prestigeconstructiongrp.com'
+};
+
+// Link do painel de acompanhamento de SPI (site de produção) de cada empresa,
+// incluído discretamente no fim do corpo do e-mail.
+var COMPANY_SPI_PANEL = {
+  'JKA': 'https://spi-supabase-1.vercel.app/jka',
+  'Prestige': 'https://spi-supabase-1.vercel.app/prestige'
+};
+
 /* ---------- login ----------
    Edite a lista abaixo para definir quem pode entrar no painel: um objeto
    { name, password } por pessoa. ATENÇÃO: como este é um arquivo HTML aberto
@@ -291,12 +311,18 @@ function statusOf(spi){ if (spi > 1) return 'good'; if (spi >= 0.85) return 'war
 var statusLabel = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
 var statusRange = { good: '> 1,00', warn: '0,85–1,00', crit: '< 0,85' };
 
-/* ---------- PM e-mail (per project) ---------- */
+/* ---------- PM e-mail / nome (per project) ---------- */
 function pmEmailForProject(project){
   var matches = DATA.filter(function(d){ return d.project === project && d.pm_email; });
   if (!matches.length) return '';
   matches.sort(function(a, b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
   return matches[0].pm_email;
+}
+function pmNameForProject(project){
+  var matches = DATA.filter(function(d){ return d.project === project && d.pm_name; });
+  if (!matches.length) return '';
+  matches.sort(function(a, b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
+  return matches[0].pm_name;
 }
 
 /* ---------- status-update e-mail generation (mirrors the e-mail templates doc) ---------- */
@@ -332,7 +358,8 @@ function buildEmailBody(d){
   var dias = emailFmtDias(d.finish_variance);
   var paras = [];
 
-  paras.push('Prezado(a) Gerente de Contrato,');
+  var pmName = pmNameForProject(d.project);
+  paras.push(pmName ? ('Prezado(a) ' + pmName + ',') : 'Prezado(a) Gerente de Contrato,');
   paras.push(
     'Este e-mail tem como objetivo informar a situação atual do indicador de SPI (Schedule Performance Index) do projeto ' +
     d.id + ' — ' + d.project + ' | ' + d.scope + ', sob execução da ' + d.company + '.'
@@ -348,6 +375,11 @@ function buildEmailBody(d){
     '(SPI igual ou maior que 1,00).'
   );
 
+  // SPI exatamente igual a 1,00 (mesmo caindo tecnicamente na faixa de
+  // ATENÇÃO, já que "Bom" exige SPI > 1,00) não deve gerar as perguntas de
+  // confirmação/variação — não há atraso real a questionar.
+  var isExactlyOne = spiStr === '1,00';
+
   if (st === 'crit'){
     paras.push(
       'Na atualização de ' + dataStr + ', o projeto está com ' + pctStr + ' de execução física e SPI de ' + spiStr +
@@ -357,7 +389,7 @@ function buildEmailBody(d){
     paras.push('Diante desse cenário, solicitamos retorno sobre os pontos abaixo:');
     paras.push(buildEmailQuestions(d).join('\n'));
     paras.push('Pedimos retorno o quanto antes para que possamos alinhar, em conjunto, um plano de recuperação de schedule para este projeto.');
-  } else if (st === 'warn'){
+  } else if (st === 'warn' && !isExactlyOne){
     paras.push(
       'Na atualização de ' + dataStr + ', o projeto está com ' + pctStr + ' de execução física e SPI de ' + spiStr +
       ', valor dentro da faixa de ATENÇÃO (entre 0,85 e 1,00). Isso indica um atraso de aproximadamente ' + dias +
@@ -366,6 +398,13 @@ function buildEmailBody(d){
     paras.push('Para isso, solicitamos retorno sobre os pontos abaixo:');
     paras.push(buildEmailQuestions(d).join('\n'));
     paras.push('Ficamos à disposição para alinhar o que for necessário.');
+  } else if (st === 'warn' && isExactlyOne){
+    // SPI = 1,00: informativo, sem perguntas de confirmação/variação.
+    paras.push(
+      'Na atualização de ' + dataStr + ', o projeto está com ' + pctStr + ' de execução física e SPI de ' + spiStr +
+      ', exatamente na meta de schedule (SPI = 1,00).'
+    );
+    paras.push('Reforçamos a importância de manter o projeto na meta de SPI (≥ 1,00) até a sua conclusão, garantindo a aderência ao schedule planejado.');
   } else {
     var extra = '';
     if (d.finish_variance < -0.5){
@@ -378,16 +417,30 @@ function buildEmailBody(d){
     paras.push('Reforçamos a importância de manter o projeto acima da meta de SPI (≥ 1,00) até a sua conclusão, garantindo a aderência ao schedule planejado.');
   }
 
-  paras.push('Atenciosamente,\n[Seu nome]');
+  var panelUrl = COMPANY_SPI_PANEL[d.company];
+  if (panelUrl){
+    paras.push('(Painel de acompanhamento de SPI: ' + panelUrl + ')');
+  }
 
   return paras.join('\n\n');
 }
 
+// Monta a lista de CC: sempre os dois endereços fixos, mais o endereço
+// específico da empresa do projeto (JKA ou Prestige), sem duplicar.
+function ccListForCompany(company){
+  var list = EMAIL_CC_ALWAYS.slice();
+  var extra = EMAIL_CC_BY_COMPANY[company];
+  if (extra && list.indexOf(extra) === -1) list.push(extra);
+  return list;
+}
+
 function openMailClient(d){
   var to = pmEmailForProject(d.project) || '';
+  var cc = ccListForCompany(d.company).join(',');
   var subject = buildEmailSubject(d);
   var body = buildEmailBody(d);
-  var url = 'mailto:' + to + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  var url = 'mailto:' + to + '?cc=' + encodeURIComponent(cc) +
+    '&subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   var a = document.createElement('a');
   a.href = url;
   a.style.display = 'none';
@@ -402,6 +455,7 @@ function openEmailConfirm(d){
   var to = pmEmailForProject(d.project);
   var text = 'Deseja gerar o e-mail de acompanhamento de SPI para ' + projectLabel(d) + '?';
   text += to ? (' Ele será enviado para ' + to + '.') : ' Nenhum e-mail de PM cadastrado para este projeto — o campo "Para" ficará em branco.';
+  text += ' Em cópia: ' + ccListForCompany(d.company).join(', ') + '.';
   var textEl = document.getElementById('emailConfirmText');
   if (textEl) textEl.textContent = text;
   var overlay = document.getElementById('emailConfirmOverlay');
@@ -419,7 +473,9 @@ function initEmailConfirm(){
   var yesBtn = document.getElementById('emailConfirmYes');
   if (noBtn) noBtn.addEventListener('click', closeEmailConfirm);
   if (yesBtn) yesBtn.addEventListener('click', function(){
-    if (pendingEmailRow) openMailClient(pendingEmailRow);
+    if (pendingEmailRow){
+      openMailClient(pendingEmailRow);
+    }
     closeEmailConfirm();
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeEmailConfirm(); });
@@ -481,10 +537,6 @@ function nextWeekLabel(label){
   nextMonday.setUTCDate(monday.getUTCDate() + 7);
   return weekLabelFromMonday(nextMonday);
 }
-function slugify(s){
-  var base = (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 24);
-  return base || 'projeto';
-}
 function bandOf(pct){ return pct <= 0.45 ? '0-45%' : (pct <= 0.90 ? '45-90%' : '90%+'); }
 function projectLabel(d){ return d.id ? (d.id + ' — ' + d.project) : d.project; }
 function newRowKey(){
@@ -526,6 +578,7 @@ async function performAdvanceWeek(){
       pct_complete: d.pct_complete, band: d.band
     };
     if (d.pm_email) row.pm_email = d.pm_email;
+    if (d.pm_name) row.pm_name = d.pm_name;
     added.push(row);
   });
 
@@ -668,7 +721,10 @@ function recordToRow(d){
     row_key: d.rowKey, id: d.id, company: d.company, project: d.project, scope: d.scope,
     cr: d.cr, baseline_duration: d.baseline_duration, finish_variance: d.finish_variance,
     schedule_duration: d.schedule_duration, spi: d.spi, week: d.week, date: d.date,
-    pct_complete: d.pct_complete, band: d.band
+    pct_complete: d.pct_complete, band: d.band,
+    // pm_email/pm_name precisam ser preservados aqui — sem isso, todo save()
+    // (persistState apaga e reinsere a tabela inteira) perdia esses dois campos.
+    pm_email: d.pm_email || null, pm_name: d.pm_name || null
   };
 }
 function rowToRecord(r){
@@ -676,7 +732,8 @@ function rowToRecord(r){
     rowKey: r.row_key, id: r.id, company: r.company, project: r.project, scope: r.scope,
     cr: r.cr, baseline_duration: r.baseline_duration, finish_variance: r.finish_variance,
     schedule_duration: r.schedule_duration, spi: r.spi, week: r.week, date: r.date,
-    pct_complete: r.pct_complete, band: r.band
+    pct_complete: r.pct_complete, band: r.band,
+    pm_email: r.pm_email || null, pm_name: r.pm_name || null
   };
 }
 
@@ -1024,6 +1081,7 @@ function drawTrendSeries(rows){
     vt.textContent = fmtSpi(d.spi);
   });
 }
+
 // alterna o título/nota acima do gráfico e o botão de voltar, conforme o modo:
 // null/false = dispersão, 'project' = histórico de 1 projeto, 'grid' = grade
 // com o histórico de SPI de cada projeto da seleção atual (empresa/escopo).
@@ -2337,6 +2395,8 @@ function openModal(mode, row){
     document.getElementById('fVariance').value = row.finish_variance;
     document.getElementById('fPct').value = Math.round(row.pct_complete * 100);
     document.getElementById('fPmEmail').value = row.pm_email || pmEmailForProject(row.project) || '';
+    var fPmNameEdit = document.getElementById('fPmName');
+    if (fPmNameEdit) fPmNameEdit.value = row.pm_name || pmNameForProject(row.project) || '';
   } else {
     document.getElementById('fWeek').value = inputValueFromWeekLabel(state.week);
     document.getElementById('fCr').value = 0;
@@ -2399,6 +2459,11 @@ function initFormListeners(){
       var known = pmEmailForProject(fProject.value.trim());
       if (known) fPmEmail.value = known;
     }
+    var fPmName = document.getElementById('fPmName');
+    if (fPmName && !fPmName.value.trim()){
+      var knownName = pmNameForProject(fProject.value.trim());
+      if (knownName) fPmName.value = knownName;
+    }
   });
   var fCode = document.getElementById('fCode');
   if (fCode) fCode.addEventListener('change', function(){
@@ -2412,6 +2477,8 @@ function initFormListeners(){
       document.getElementById('fScope').value = match.scope;
       var fPmEmail = document.getElementById('fPmEmail');
       if (fPmEmail && !fPmEmail.value.trim() && match.pm_email) fPmEmail.value = match.pm_email;
+      var fPmName = document.getElementById('fPmName');
+      if (fPmName && !fPmName.value.trim() && match.pm_name) fPmName.value = match.pm_name;
     }
   });
   var btnAdd = document.getElementById('btnAdd');
@@ -2486,6 +2553,8 @@ function initFormListeners(){
     var variance = parseFloat(document.getElementById('fVariance').value) || 0;
     var pctRaw = parseFloat(document.getElementById('fPct').value);
     var pmEmail = document.getElementById('fPmEmail').value.trim();
+    var pmNameEl = document.getElementById('fPmName');
+    var pmName = pmNameEl ? pmNameEl.value.trim() : '';
 
     var errEl = document.getElementById('formError');
     if (!code || !project || !company || !scope || !weekLabel || isNaN(base) || base < 0 || isNaN(pctRaw)){
@@ -2494,6 +2563,19 @@ function initFormListeners(){
       return;
     }
     errEl.classList.remove('show');
+
+    // impede lançamento duplicado: já existe um registro para a mesma
+    // empresa/projeto/escopo/semana? (ignora o próprio registro, se estiver
+    // editando um já existente).
+    var duplicate = DATA.some(function(d){
+      return d.rowKey !== editingKey && d.company === company && d.project === project &&
+        d.scope === scope && d.week === weekLabel;
+    });
+    if (duplicate){
+      errEl.textContent = 'Já existe um lançamento para "' + project + '" (' + scope + ') na semana ' + weekLabel + '. Edite o lançamento existente em vez de criar um novo.';
+      errEl.classList.add('show');
+      return;
+    }
 
     var sched = base + variance;
     var spi = sched > 0 ? base / sched : 0;
@@ -2507,7 +2589,7 @@ function initFormListeners(){
       cr: cr, baseline_duration: round4(base), finish_variance: round4(variance),
       schedule_duration: round4(sched), spi: round4(spi),
       week: weekLabel, date: dateFromWeekLabel(weekLabel),
-      pct_complete: round4(pct), band: bandOf(pct), pm_email: pmEmail
+      pct_complete: round4(pct), band: bandOf(pct), pm_email: pmEmail, pm_name: pmName
     };
 
     var newData = editingKey ? DATA.map(function(d){ return d.rowKey === editingKey ? row : d; }) : DATA.concat([row]);

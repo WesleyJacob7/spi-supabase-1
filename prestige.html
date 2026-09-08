@@ -739,6 +739,11 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
           <input type="email" id="fPmEmail" name="pm_email" autocomplete="off" placeholder="pm@company.com">
           <span class="form-hint">Used by the "Enviar e-mail ao PM" button next to "+ Novo lançamento".</span>
         </div>
+        <div class="form-field span2">
+          <label for="fPmName">PM name (optional)</label>
+          <input type="text" id="fPmName" name="pm_name" autocomplete="off" placeholder="Nome do Gerente de Contrato">
+          <span class="form-hint">Usado na saudação do e-mail ("Prezado(a) [Nome do PM],"); sem isso, o e-mail usa "Prezado(a) Gerente de Contrato,".</span>
+        </div>
         <div class="form-error" id="formError"></div>
         <div class="form-preview">
           <div class="fp-item"><span class="fp-label">Scheduled duration</span><span class="fp-value" id="prevSched">&mdash;</span></div>
