@@ -672,18 +672,21 @@ function initEmailConfirm(){
   if (noBtn) noBtn.addEventListener('click', closeEmailConfirm);
   if (yesBtn) yesBtn.addEventListener('click', function(){
     if (pendingEmailRow){
-      var row = pendingEmailRow;
+            var row = pendingEmailRow;
       copyProjectChartToClipboard(row.project).then(function(copied){
+        // alerta bloqueante (em vez de um toast que some sozinho) — como o
+        // app não tem como saber se a imagem foi realmente colada dentro do
+        // Outlook (isso acontece em outro programa, fora do alcance da
+        // página), o jeito de não deixar passar batido é forçar uma parada
+        // aqui: só depois de você clicar OK é que o Outlook abre.
+        if (copied){
+          window.alert('Gráfico de SPI copiado!\n\nAntes de clicar em Enviar no Outlook, cole a imagem (Ctrl+V) no corpo do e-mail, logo antes da assinatura.');
+        } else {
+          window.alert('Não foi possível copiar o gráfico automaticamente (este navegador não suporta essa função).\n\nO e-mail vai abrir sem a imagem — cole ou anexe o gráfico manualmente antes de enviar, se precisar.');
+        }
         openMailClient(row);
-        showToast(
-          copied
-            ? 'Gráfico de SPI copiado — cole (Ctrl+V) no e-mail antes da assinatura.'
-            : 'E-mail gerado, mas não foi possível copiar o gráfico automaticamente (navegador sem suporte). Cole ou anexe manualmente, se precisar.',
-          copied ? undefined : 'warn'
-        );
       });
     }
-    closeEmailConfirm();
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeEmailConfirm(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeEmailConfirm(); });
