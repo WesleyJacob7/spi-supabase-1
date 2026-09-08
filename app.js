@@ -449,6 +449,203 @@ function openMailClient(d){
   document.body.removeChild(a);
 }
 
+/* ---------- imagem do histórico de SPI para colar no e-mail ----------
+   O link mailto: só aceita corpo em texto puro — não existe forma de embutir
+   uma imagem diretamente no corpo do e-mail por esse caminho, em nenhum
+   cliente de e-mail. Por isso, em vez de baixar um arquivo (como era feito
+   antes), a imagem do histórico de SPI do projeto é copiada para a área de
+   transferência assim que o usuário confirma o envio, para colar (Ctrl+V) no
+   corpo do e-mail antes da assinatura. A imagem é sempre o histórico do
+   projeto do e-mail (independente do que estiver visível no <svg id="chart">
+   da tela no momento), construída à parte para não depender do modo de
+   visualização atual. */
+function readCssVar(name, fallback){
+  try {
+    var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+    return (v && v.trim()) ? v.trim() : fallback;
+  } catch (e){ return fallback; }
+}
+function buildEmailChartSvg(project){
+  var trendRows = projectTrendRows(project);
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var pad = 24, headerH = 78;
+  var totalW = W + pad * 2;
+  var totalH = H + headerH + pad * 2;
+  var fontFamily = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+
+  // cores resolvidas do tema atual (claro/escuro) — precisam ser valores
+  // finais (não var(--x)) porque a imagem é servida via blob de um SVG
+  // isolado, fora da cascata de CSS da página.
+  var c = {
+    bg: readCssVar('--surface-1', '#fcfcfb'),
+    border: readCssVar('--border', 'rgba(11,11,11,0.10)'),
+    textPrimary: readCssVar('--text-primary', '#0b0b0b'),
+    textSecondary: readCssVar('--text-secondary', '#52514e'),
+    textMuted: readCssVar('--text-muted', '#898781'),
+    hairline: readCssVar('--hairline', '#e1e0d9'),
+    baseline: readCssVar('--baseline', '#c3c2b7'),
+    good: readCssVar('--status-good', '#0ca30c'),
+    warnMark: readCssVar('--status-warning-mark', '#fab219'),
+    crit: readCssVar('--status-critical', '#d03b3b'),
+    goodWash: readCssVar('--status-good-wash', 'rgba(12,163,12,0.08)'),
+    warnWash: readCssVar('--status-warning-wash', 'rgba(250,178,25,0.16)'),
+    critWash: readCssVar('--status-critical-wash', 'rgba(208,59,59,0.07)')
+  };
+
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('xmlns', svgNS);
+  svg.setAttribute('width', totalW);
+  svg.setAttribute('height', totalH);
+  svg.setAttribute('viewBox', '0 0 ' + totalW + ' ' + totalH);
+
+  function node(tag, attrs, parent){
+    var e = document.createElementNS(svgNS, tag);
+    for (var k in attrs){ e.setAttribute(k, attrs[k]); }
+    (parent || svg).appendChild(e);
+    return e;
+  }
+
+  node('rect', { x: 0, y: 0, width: totalW, height: totalH, fill: c.bg });
+  node('rect', { x: 0.5, y: 0.5, width: totalW - 1, height: totalH - 1, fill: 'none', stroke: c.border });
+
+  var title = node('text', { x: pad, y: pad + 16, 'font-family': fontFamily, 'font-size': 18, 'font-weight': 700, fill: c.textPrimary });
+  title.textContent = 'Histórico de SPI — ' + project;
+
+  var note = node('text', { x: pad, y: pad + 34, 'font-family': fontFamily, 'font-size': 12, fill: c.textMuted });
+  note.textContent = 'SPI de "' + project + '" em cada semana com avanço registrado (' + trendRows.length + ' semana(s)).';
+
+  // legenda (mesmos textos/cores do painel)
+  var legendItems = [
+    { label: 'Bom — SPI > 1,00', color: c.good },
+    { label: 'Atenção — SPI 0,85 a 1,00', color: c.warnMark },
+    { label: 'Crítico — SPI < 0,85', color: c.crit }
+  ];
+  var lx = pad, ly = pad + 56;
+  legendItems.forEach(function(it){
+    node('circle', { cx: lx + 5, cy: ly - 4, r: 5, fill: it.color });
+    var t = node('text', { x: lx + 15, y: ly, 'font-family': fontFamily, 'font-size': 12, 'font-weight': 500, fill: c.textSecondary });
+    t.textContent = it.label;
+    lx += 22 + it.label.length * 6.3;
+  });
+  node('line', { x1: lx, x2: lx + 20, y1: ly - 4, y2: ly - 4, stroke: c.textMuted, 'stroke-width': 2, 'stroke-dasharray': '3 4' });
+  var dtxt = node('text', { x: lx + 28, y: ly, 'font-family': fontFamily, 'font-size': 12, 'font-weight': 500, fill: c.textSecondary });
+  dtxt.textContent = 'Faixas de SPI (1,00 / 0,85)';
+
+  // gráfico propriamente dito, deslocado abaixo do cabeçalho/legenda — mesma
+  // geometria (W/H/M/xScale/yScale/trendXScale) do histórico exibido no painel.
+  var g = node('g', { transform: 'translate(' + pad + ',' + headerH + ')' });
+
+  node('rect', { x: M.left, y: yScale(yMax), width: plotW, height: yScale(1) - yScale(yMax), fill: c.goodWash }, g);
+  node('rect', { x: M.left, y: yScale(1), width: plotW, height: yScale(0.85) - yScale(1), fill: c.warnWash }, g);
+  node('rect', { x: M.left, y: yScale(0.85), width: plotW, height: yScale(yMin) - yScale(0.85), fill: c.critWash }, g);
+
+  for (var yv = yMin; yv <= yMax + 0.0001; yv += 0.1){
+    var gy = yScale(yv);
+    node('line', { x1: M.left, x2: M.left + plotW, y1: gy, y2: gy, stroke: c.hairline, 'stroke-width': 1 }, g);
+    var t2 = node('text', { x: M.left - 10, y: gy + 3.5, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, fill: c.textMuted }, g);
+    t2.textContent = yv.toFixed(2);
+  }
+
+  var xLabelStep = trendRows.length > 1 ? Math.max(1, Math.ceil(26 / (plotW / (trendRows.length - 1)))) : 1;
+  trendRows.forEach(function(d, i){
+    if (i % xLabelStep !== 0 && i !== trendRows.length - 1) return;
+    var x = trendXScale(i, trendRows.length);
+    var y = M.top + plotH + 16;
+    var xt = node('text', { x: x, y: y, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, fill: c.textMuted,
+      transform: 'rotate(-40 ' + x + ' ' + y + ')' }, g);
+    xt.textContent = fmtDateMDY(d.date);
+  });
+
+  node('line', { x1: M.left, x2: M.left + plotW, y1: M.top + plotH, y2: M.top + plotH, stroke: c.baseline, 'stroke-width': 1 }, g);
+  node('line', { x1: M.left, x2: M.left, y1: M.top, y2: M.top + plotH, stroke: c.baseline, 'stroke-width': 1 }, g);
+
+  var ty = yScale(1);
+  node('line', { x1: M.left, x2: M.left + plotW, y1: ty, y2: ty, stroke: c.textMuted, 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }, g);
+  var lbl = node('text', { x: M.left + plotW, y: ty - 6, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
+  lbl.textContent = 'Meta / limite bom (SPI = 1,00)';
+
+  var ty2 = yScale(0.85);
+  node('line', { x1: M.left, x2: M.left + plotW, y1: ty2, y2: ty2, stroke: c.textMuted, 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }, g);
+  var lbl2 = node('text', { x: M.left + plotW, y: ty2 - 6, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
+  lbl2.textContent = 'Limite atenção / crítico (0,85)';
+
+  var xt2 = node('text', { x: M.left + plotW / 2, y: H - 6, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 10, fill: c.textMuted }, g);
+  xt2.textContent = 'Data de referência';
+  var yt2 = node('text', { x: -(M.top + plotH / 2), y: 16, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 10, fill: c.textMuted,
+    transform: 'rotate(-90)' }, g);
+  yt2.textContent = 'SPI (índice de desempenho de prazo)';
+
+  if (trendRows.length){
+    var pointsStr = trendRows.map(function(d, i){
+      return trendXScale(i, trendRows.length) + ',' + yScale(Math.min(Math.max(d.spi, yMin), yMax));
+    }).join(' ');
+    node('polyline', { points: pointsStr, fill: 'none', stroke: c.textSecondary, 'stroke-width': 2, opacity: 0.55 }, g);
+
+    trendRows.forEach(function(d, i){
+      var cx = trendXScale(i, trendRows.length);
+      var cy = yScale(Math.min(Math.max(d.spi, yMin), yMax));
+      var st = statusOf(d.spi);
+      var color = st === 'good' ? c.good : st === 'warn' ? c.warnMark : c.crit;
+      node('circle', { cx: cx, cy: cy, r: 5, fill: color, stroke: c.bg, 'stroke-width': 2 }, g);
+      var vt = node('text', { x: cx, y: cy - 12, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 600, fill: c.textSecondary }, g);
+      vt.textContent = fmtSpi(d.spi);
+    });
+  }
+
+  return { svg: svg, width: totalW, height: totalH };
+}
+
+function svgElementToPngBlob(svgEl, width, height, scale){
+  return new Promise(function(resolve, reject){
+    try {
+      var svgString = new XMLSerializer().serializeToString(svgEl);
+      var svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      var url = URL.createObjectURL(svgBlob);
+      var img = new Image();
+      img.onload = function(){
+        var s = scale || 2; // renderiza em 2x para colar com boa nitidez
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(width * s);
+        canvas.height = Math.round(height * s);
+        var ctx = canvas.getContext('2d');
+        ctx.scale(s, s);
+        ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function(blob){
+          if (blob) resolve(blob); else reject(new Error('Falha ao gerar PNG do gráfico.'));
+        }, 'image/png');
+      };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('Falha ao carregar o SVG do gráfico.')); };
+      img.src = url;
+    } catch (e){ reject(e); }
+  });
+}
+
+// Gera o PNG do histórico de SPI do projeto e copia para a área de
+// transferência. Resolve para true se a cópia deu certo, false caso o
+// navegador não suporte (ou algo falhe) — nesse caso o e-mail ainda é aberto
+// normalmente, só sem a cópia automática.
+function copyProjectChartToClipboard(project){
+  if (!navigator.clipboard || typeof window.ClipboardItem !== 'function'){
+    return Promise.resolve(false);
+  }
+  try {
+    var built = buildEmailChartSvg(project);
+    return svgElementToPngBlob(built.svg, built.width, built.height, 2)
+      .then(function(blob){
+        return navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
+      })
+      .then(function(){ return true; })
+      .catch(function(err){
+        console.warn('Não foi possível copiar o gráfico de SPI para a área de transferência:', err);
+        return false;
+      });
+  } catch (e){
+    console.warn('Não foi possível gerar o gráfico de SPI para o e-mail:', e);
+    return Promise.resolve(false);
+  }
+}
+
 var pendingEmailRow = null;
 function openEmailConfirm(d){
   pendingEmailRow = d;
@@ -456,6 +653,7 @@ function openEmailConfirm(d){
   var text = 'Deseja gerar o e-mail de acompanhamento de SPI para ' + projectLabel(d) + '?';
   text += to ? (' Ele será enviado para ' + to + '.') : ' Nenhum e-mail de PM cadastrado para este projeto — o campo "Para" ficará em branco.';
   text += ' Em cópia: ' + ccListForCompany(d.company).join(', ') + '.';
+  text += ' O gráfico de histórico de SPI do projeto será copiado para a área de transferência, para você colar (Ctrl+V) no corpo do e-mail antes da assinatura.';
   var textEl = document.getElementById('emailConfirmText');
   if (textEl) textEl.textContent = text;
   var overlay = document.getElementById('emailConfirmOverlay');
@@ -474,7 +672,16 @@ function initEmailConfirm(){
   if (noBtn) noBtn.addEventListener('click', closeEmailConfirm);
   if (yesBtn) yesBtn.addEventListener('click', function(){
     if (pendingEmailRow){
-      openMailClient(pendingEmailRow);
+      var row = pendingEmailRow;
+      copyProjectChartToClipboard(row.project).then(function(copied){
+        openMailClient(row);
+        showToast(
+          copied
+            ? 'Gráfico de SPI copiado — cole (Ctrl+V) no e-mail antes da assinatura.'
+            : 'E-mail gerado, mas não foi possível copiar o gráfico automaticamente (navegador sem suporte). Cole ou anexe manualmente, se precisar.',
+          copied ? undefined : 'warn'
+        );
+      });
     }
     closeEmailConfirm();
   });
