@@ -747,14 +747,29 @@ function initEmailConfirm(){
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeEmailConfirm(); });
 }
 
-/* ---------- confirmação do lembrete ("Lembrar PM") ---------- */
+/* ---------- confirmação do lembrete ("Lembrar PM") ----------
+   Um e-mail novo (via mailto:) nunca entra na mesma conversa do e-mail
+   original no Outlook — o agrupamento por conversa depende de uma marcação
+   interna que só é criada quando a própria pessoa usa "Responder" dentro do
+   e-mail já enviado, não pelo texto do assunto batendo. Por isso, em vez de
+   abrir um rascunho novo, o botão copia o texto do lembrete para a área de
+   transferência (mesmo padrão do gráfico de SPI em copyProjectChartToClipboard)
+   para colar dentro de uma resposta de verdade ao e-mail original. */
+function copyTextToClipboard(text){
+  if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function'){
+    return Promise.resolve(false);
+  }
+  return navigator.clipboard.writeText(text).then(function(){ return true; }).catch(function(err){
+    console.warn('Não foi possível copiar o texto do lembrete para a área de transferência:', err);
+    return false;
+  });
+}
+
 var pendingRemindRow = null;
 function openRemindConfirm(d){
   pendingRemindRow = d;
-  var to = pmEmailForProject(d.project);
-  var text = 'Deseja gerar o e-mail de lembrete de SPI para ' + projectLabel(d) + '?';
-  text += to ? (' Ele será enviado para ' + to + '.') : ' Nenhum e-mail de PM cadastrado para este projeto — o campo "Para" ficará em branco.';
-  text += ' Em cópia: ' + ccListForCompany(d.company).join(', ') + '.';
+  var text = 'Deseja copiar o texto do lembrete de SPI para ' + projectLabel(d) + '?';
+  text += ' Depois é só abrir o e-mail original nos Enviados, clicar em Responder e colar (Ctrl+V) — assim o lembrete fica no mesmo histórico da conversa, em vez de virar um e-mail novo.';
   var textEl = document.getElementById('remindConfirmText');
   if (textEl) textEl.textContent = text;
   var previewEl = document.getElementById('remindConfirmPreview');
@@ -775,10 +790,16 @@ function initRemindConfirm(){
   if (noBtn) noBtn.addEventListener('click', closeRemindConfirm);
   if (yesBtn) yesBtn.addEventListener('click', function(){
     var row = pendingRemindRow;
-    closeRemindConfirm();
-    if (!row) return;
-    openReminderMailClient(row);
-    showToast('E-mail de lembrete gerado para ' + projectLabel(row) + ' (mailto aberto).', '');
+    if (!row){ closeRemindConfirm(); return; }
+    var body = buildReminderBody(row);
+    copyTextToClipboard(body).then(function(copied){
+      if (copied){
+        closeRemindConfirm();
+        window.alert('Texto do lembrete copiado!\n\nAbra o e-mail original nos Enviados, clique em Responder e cole (Ctrl+V) o texto antes de enviar — assim ele fica no mesmo histórico da conversa.');
+      } else {
+        window.alert('Não foi possível copiar automaticamente (este navegador não suporta essa função).\n\nSelecione o texto do lembrete nesta janela e copie manualmente (Ctrl+C) antes de fechar.');
+      }
+    });
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeRemindConfirm(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeRemindConfirm(); });
