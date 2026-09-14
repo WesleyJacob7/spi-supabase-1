@@ -446,7 +446,7 @@ function buildReminderBody(d){
   paras.push('Qualquer dúvida, ficamos à disposição.');
   var panelUrl = COMPANY_SPI_PANEL[d.company];
   if (panelUrl){
-    paras.push('(Painel de acompanhamento de SPI: ' + panelUrl + ')');
+    paras.push('Painel de acompanhamento de SPI: ' + panelUrl);
   }
   return paras.join('\n\n');
 }
