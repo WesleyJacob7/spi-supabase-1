@@ -431,7 +431,7 @@ function buildEmailBody(d){
    depois que esse primeiro e-mail já foi gerado para o lançamento em questão
    (ver email_sent_at em recordToRow/rowToRecord e o botão "Lembrar PM"). */
 function buildReminderSubject(d){
-  return 'Lembrete — ' + buildEmailSubject(d);
+  return 'RE: ' + buildEmailSubject(d);
 }
 function buildReminderBody(d){
   var pmName = pmNameForProject(d.project);
