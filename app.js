@@ -419,7 +419,7 @@ function buildEmailBody(d){
 
   var panelUrl = COMPANY_SPI_PANEL[d.company];
   if (panelUrl){
-    paras.push('(Painel de acompanhamento de SPI: ' + panelUrl + ')');
+    paras.push('Painel de acompanhamento de SPI: ' + panelUrl);
   }
 
   return paras.join('\n\n');
