@@ -425,6 +425,32 @@ function buildEmailBody(d){
   return paras.join('\n\n');
 }
 
+/* ---------- e-mail de lembrete ("Lembrar PM") ----------
+   Segundo e-mail, enviado quando o PM ainda não respondeu ao e-mail de
+   acompanhamento de SPI original (buildEmailBody acima). Só fica disponível
+   depois que esse primeiro e-mail já foi gerado para o lançamento em questão
+   (ver email_sent_at em recordToRow/rowToRecord e o botão "Lembrar PM"). */
+function buildReminderSubject(d){
+  return 'Lembrete — ' + buildEmailSubject(d);
+}
+function buildReminderBody(d){
+  var pmName = pmNameForProject(d.project);
+  var paras = [];
+  paras.push(pmName ? ('Prezado(a) ' + pmName + ',') : 'Prezado(a) Gerente de Contrato,');
+  paras.push(
+    'Este é um lembrete referente ao e-mail de acompanhamento de SPI (Schedule Performance Index) enviado sobre o ' +
+    'projeto ' + d.id + ' — ' + d.project + ' | ' + d.scope + ', sob execução da ' + d.company + '. Até o momento, ' +
+    'ainda não recebemos seu retorno.'
+  );
+  paras.push('Pedimos a gentileza de validar as informações e nos posicionar, para que possamos manter o acompanhamento do schedule deste projeto atualizado.');
+  paras.push('Qualquer dúvida, ficamos à disposição.');
+  var panelUrl = COMPANY_SPI_PANEL[d.company];
+  if (panelUrl){
+    paras.push('(Painel de acompanhamento de SPI: ' + panelUrl + ')');
+  }
+  return paras.join('\n\n');
+}
+
 // Monta a lista de CC: sempre os dois endereços fixos, mais o endereço
 // específico da empresa do projeto (JKA ou Prestige), sem duplicar.
 function ccListForCompany(company){
@@ -439,6 +465,23 @@ function openMailClient(d){
   var cc = ccListForCompany(d.company).join(',');
   var subject = buildEmailSubject(d);
   var body = buildEmailBody(d);
+  var url = 'mailto:' + to + '?cc=' + encodeURIComponent(cc) +
+    '&subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  var a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Mesmo mecanismo de openMailClient(), só que com o assunto/corpo do
+// lembrete (buildReminderSubject/buildReminderBody) em vez do e-mail original.
+function openReminderMailClient(d){
+  var to = pmEmailForProject(d.project) || '';
+  var cc = ccListForCompany(d.company).join(',');
+  var subject = buildReminderSubject(d);
+  var body = buildReminderBody(d);
   var url = 'mailto:' + to + '?cc=' + encodeURIComponent(cc) +
     '&subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   var a = document.createElement('a');
@@ -672,7 +715,7 @@ function initEmailConfirm(){
   if (noBtn) noBtn.addEventListener('click', closeEmailConfirm);
   if (yesBtn) yesBtn.addEventListener('click', function(){
     if (pendingEmailRow){
-            var row = pendingEmailRow;
+      var row = pendingEmailRow;
       copyProjectChartToClipboard(row.project).then(function(copied){
         // alerta bloqueante (em vez de um toast que some sozinho) — como o
         // app não tem como saber se a imagem foi realmente colada dentro do
@@ -685,11 +728,60 @@ function initEmailConfirm(){
           window.alert('Não foi possível copiar o gráfico automaticamente (este navegador não suporta essa função).\n\nO e-mail vai abrir sem a imagem — cole ou anexe o gráfico manualmente antes de enviar, se precisar.');
         }
         openMailClient(row);
+        closeEmailConfirm(); // o diálogo ficava aberto atrás do alerta acima; fecha para liberar a tela (inclui "Lembrar PM")
+        // marca este lançamento como "1º e-mail enviado" — é o que habilita
+        // o botão "Lembrar PM" para ele (ver render() e email_sent_at em
+        // recordToRow/rowToRecord). Se o Supabase não estiver configurado,
+        // persistState() já mostra o aviso de sempre e retorna true (só não
+        // grava fora desta visualização).
+        var wasSent = !!row.email_sent_at;
+        row.email_sent_at = new Date().toISOString();
+        persistState().then(function(ok){
+          if (!ok && !wasSent) row.email_sent_at = null;
+          render();
+        });
       });
     }
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeEmailConfirm(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeEmailConfirm(); });
+}
+
+/* ---------- confirmação do lembrete ("Lembrar PM") ---------- */
+var pendingRemindRow = null;
+function openRemindConfirm(d){
+  pendingRemindRow = d;
+  var to = pmEmailForProject(d.project);
+  var text = 'Deseja gerar o e-mail de lembrete de SPI para ' + projectLabel(d) + '?';
+  text += to ? (' Ele será enviado para ' + to + '.') : ' Nenhum e-mail de PM cadastrado para este projeto — o campo "Para" ficará em branco.';
+  text += ' Em cópia: ' + ccListForCompany(d.company).join(', ') + '.';
+  var textEl = document.getElementById('remindConfirmText');
+  if (textEl) textEl.textContent = text;
+  var previewEl = document.getElementById('remindConfirmPreview');
+  if (previewEl) previewEl.textContent = buildReminderBody(d);
+  var overlay = document.getElementById('remindConfirmOverlay');
+  if (overlay) overlay.hidden = false;
+}
+function closeRemindConfirm(){
+  var overlay = document.getElementById('remindConfirmOverlay');
+  if (overlay) overlay.hidden = true;
+  pendingRemindRow = null;
+}
+function initRemindConfirm(){
+  var overlay = document.getElementById('remindConfirmOverlay');
+  if (!overlay) return;
+  var noBtn = document.getElementById('remindConfirmNo');
+  var yesBtn = document.getElementById('remindConfirmYes');
+  if (noBtn) noBtn.addEventListener('click', closeRemindConfirm);
+  if (yesBtn) yesBtn.addEventListener('click', function(){
+    var row = pendingRemindRow;
+    closeRemindConfirm();
+    if (!row) return;
+    openReminderMailClient(row);
+    showToast('E-mail de lembrete gerado para ' + projectLabel(row) + ' (mailto aberto).', '');
+  });
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) closeRemindConfirm(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeRemindConfirm(); });
 }
 
 function weekLabelFromInputValue(v){
@@ -932,9 +1024,11 @@ function recordToRow(d){
     cr: d.cr, baseline_duration: d.baseline_duration, finish_variance: d.finish_variance,
     schedule_duration: d.schedule_duration, spi: d.spi, week: d.week, date: d.date,
     pct_complete: d.pct_complete, band: d.band,
-    // pm_email/pm_name precisam ser preservados aqui — sem isso, todo save()
-    // (persistState apaga e reinsere a tabela inteira) perdia esses dois campos.
-    pm_email: d.pm_email || null, pm_name: d.pm_name || null
+    // pm_email/pm_name/email_sent_at precisam ser preservados aqui — sem
+    // isso, todo save() (persistState apaga e reinsere a tabela inteira)
+    // perdia esses campos.
+    pm_email: d.pm_email || null, pm_name: d.pm_name || null,
+    email_sent_at: d.email_sent_at || null
   };
 }
 function rowToRecord(r){
@@ -943,7 +1037,8 @@ function rowToRecord(r){
     cr: r.cr, baseline_duration: r.baseline_duration, finish_variance: r.finish_variance,
     schedule_duration: r.schedule_duration, spi: r.spi, week: r.week, date: r.date,
     pct_complete: r.pct_complete, band: r.band,
-    pm_email: r.pm_email || null, pm_name: r.pm_name || null
+    pm_email: r.pm_email || null, pm_name: r.pm_name || null,
+    email_sent_at: r.email_sent_at || null
   };
 }
 
@@ -2369,10 +2464,23 @@ function render(){
   if (idWeek) idWeek.textContent = state.week || '—';
 
   var btnEmailHead = document.getElementById('btnEmailHead');
+  var isolatedRow = state.isolatedProject ? rows.find(function(d){ return d.project === state.isolatedProject; }) : null;
   if (btnEmailHead){
-    var isolatedRow = state.isolatedProject ? rows.find(function(d){ return d.project === state.isolatedProject; }) : null;
     btnEmailHead.disabled = !isolatedRow;
     btnEmailHead.title = isolatedRow ? 'Enviar e-mail de acompanhamento de SPI para ' + projectLabel(isolatedRow) : 'Clique no nome de um projeto na tabela para selecioná-lo';
+  }
+  var btnRemindHead = document.getElementById('btnRemindHead');
+  if (btnRemindHead){
+    if (!isolatedRow){
+      btnRemindHead.disabled = true;
+      btnRemindHead.title = 'Clique no nome de um projeto na tabela para selecioná-lo';
+    } else if (!isolatedRow.email_sent_at){
+      btnRemindHead.disabled = true;
+      btnRemindHead.title = 'Envie primeiro o e-mail de acompanhamento de SPI ("Enviar e-mail ao PM") para este lançamento';
+    } else {
+      btnRemindHead.disabled = false;
+      btnRemindHead.title = 'Enviar lembrete de retorno de SPI para ' + projectLabel(isolatedRow);
+    }
   }
 
   var withSpi = rows.filter(function(d){ return typeof d.spi === 'number' && d.pct_complete > 0; });
@@ -2714,6 +2822,12 @@ function initFormListeners(){
     var row = currentRows().find(function(d){ return d.project === state.isolatedProject; });
     if (row) openEmailConfirm(row);
   });
+  var btnRemindHead = document.getElementById('btnRemindHead');
+  if (btnRemindHead) btnRemindHead.addEventListener('click', function(){
+    if (!state.isolatedProject) return;
+    var row = currentRows().find(function(d){ return d.project === state.isolatedProject; });
+    if (row && row.email_sent_at) openRemindConfirm(row);
+  });
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('btnCancel').addEventListener('click', closeModal);
   document.getElementById('modalOverlay').addEventListener('click', function(e){
@@ -2799,7 +2913,10 @@ function initFormListeners(){
       cr: cr, baseline_duration: round4(base), finish_variance: round4(variance),
       schedule_duration: round4(sched), spi: round4(spi),
       week: weekLabel, date: dateFromWeekLabel(weekLabel),
-      pct_complete: round4(pct), band: bandOf(pct), pm_email: pmEmail, pm_name: pmName
+      pct_complete: round4(pct), band: bandOf(pct), pm_email: pmEmail, pm_name: pmName,
+      // preserva o "1º e-mail enviado" deste lançamento ao editar (senão o
+      // botão "Lembrar PM" voltaria a ficar bloqueado a cada edição comum).
+      email_sent_at: editingKey && editingRow ? (editingRow.email_sent_at || null) : null
     };
 
     var newData = editingKey ? DATA.map(function(d){ return d.rowKey === editingKey ? row : d; }) : DATA.concat([row]);
@@ -2880,6 +2997,7 @@ async function boot(){
   buildStaticChart();
   renderLegend();
   initEmailConfirm();
+  initRemindConfirm();
   initExcludeConfirm();
   initAdvanceConfirm();
   initDeleteWeekConfirm();
