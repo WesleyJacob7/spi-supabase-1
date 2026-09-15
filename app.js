@@ -940,22 +940,24 @@ var pmEmailLogSummary = {};
 async function refreshPmEmailLogSummary(){
   if (!supabaseClient) return;
   try {
-    var res = await supabaseClient.from('pm_email_log').select('project, kind, created_at, spi_status').in('kind', ['email_sent', 'reminder_sent', 'pm_reply']);
+    var res = await supabaseClient.from('pm_email_log').select('project, kind, created_at, spi_status, spi_value, ref_date').in('kind', ['email_sent', 'reminder_sent', 'pm_reply']);
     if (res.error) throw res.error;
     var summary = {};
     (res.data || []).forEach(function(ev){
-      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null, lastEmailSent: null, lastEmailSentStatus: null });
+      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null, lastEmailSent: null, lastEmailSentStatus: null, lastEmailSentSpiValue: null, lastEmailSentRefDate: null });
       if (ev.kind === 'reminder_sent'){
         if (!s.lastReminder || new Date(ev.created_at) > new Date(s.lastReminder)) s.lastReminder = ev.created_at;
       } else if (ev.kind === 'pm_reply'){
         if (!s.lastReply || new Date(ev.created_at) > new Date(s.lastReply)) s.lastReply = ev.created_at;
       } else if (ev.kind === 'email_sent'){
-        // guarda o status do SPI congelado no momento deste envio — usado
-        // para não cobrar resposta de um e-mail que saiu com SPI Bom, ver
-        // projectsNeedingReminder.
+        // guarda o status/valor/data de referência do SPI congelados no momento
+        // deste envio — usado para não cobrar resposta de um e-mail que saiu
+        // com SPI Bom, e para mostrar esses dados na lista de auditoria.
         if (!s.lastEmailSent || new Date(ev.created_at) > new Date(s.lastEmailSent)){
           s.lastEmailSent = ev.created_at;
           s.lastEmailSentStatus = ev.spi_status || null;
+          s.lastEmailSentSpiValue = (typeof ev.spi_value === 'number') ? ev.spi_value : null;
+          s.lastEmailSentRefDate = ev.ref_date || null;
         }
       }
     });
@@ -1001,7 +1003,9 @@ function reminderAlertLists(){
     if (lastReminder && lastReminder > sentDate) return; // já lembrou depois deste e-mail
     if (lastReply && lastReply > sentDate) return; // já tem resposta depois deste e-mail
     if (frozenStatus === 'good'){
-      goodAtSend.push({ row: row, daysSince: daysSince });
+      var frozenSpiValue = (summary && typeof summary.lastEmailSentSpiValue === 'number') ? summary.lastEmailSentSpiValue : row.spi;
+      var frozenRefDate = (summary && summary.lastEmailSentRefDate) ? summary.lastEmailSentRefDate : row.date;
+      goodAtSend.push({ row: row, daysSince: daysSince, spiValue: frozenSpiValue, refDate: frozenRefDate });
     } else {
       needsReminder.push({ row: row, daysSince: daysSince });
     }
@@ -1029,13 +1033,17 @@ function renderReminderAlertItems(container, items, showButton, emptyMessage){
     info.className = 'reminder-alert-info';
     var name = document.createElement('span');
     name.className = 'reminder-alert-project';
-    name.textContent = projectLabel(row);
+    if (!showButton && typeof entry.spiValue === 'number'){
+      name.textContent = 'SPI ' + fmtSpi(entry.spiValue) + ' — ' + projectLabel(row);
+    } else {
+      name.textContent = projectLabel(row);
+    }
     info.appendChild(name);
     var days = document.createElement('span');
     days.className = 'reminder-alert-days';
     days.textContent = showButton
       ? ('e-mail enviado há ' + entry.daysSince + ' dias, sem resposta registrada')
-      : ('e-mail enviado há ' + entry.daysSince + ' dias com SPI Bom — sem cobrança de resposta');
+      : ('Data de referência do último envio: ' + (entry.refDate ? fmtDateMDY(entry.refDate) : '—'));
     info.appendChild(days);
     line.appendChild(info);
     if (showButton){

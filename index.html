@@ -242,7 +242,6 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
 .reminder-alert-secondary-title::before{ content:"▸ "; }
 details[open] > .reminder-alert-secondary-title::before{ content:"▾ "; }
 .reminder-alert-secondary-title:hover{ color: var(--text-primary); }
-.reminder-alert-secondary-sub{ font-size:12px; color: var(--text-muted); margin: 6px 0 10px; }
 .reminder-alert-list.muted .reminder-alert-item{ opacity:.8; }
 .reminder-alert-list.muted .reminder-alert-project{ font-weight:500; }
 .card-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size: 19px; letter-spacing:-0.005em; }
@@ -649,7 +648,6 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     <div class="reminder-alert-list" id="reminderAlertList"></div>
     <details class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
       <summary class="reminder-alert-secondary-title" id="reminderAlertGoodTitle">Sem lembrete necessário (SPI bom no envio)</summary>
-      <p class="reminder-alert-secondary-sub">Esses projetos também estão há mais de 1 semana sem contato, mas o SPI já estava bom quando o e-mail foi enviado — por isso não têm o botão "Lembrar PM".</p>
       <div class="reminder-alert-list muted" id="reminderAlertGoodList"></div>
     </details>
   </div>
