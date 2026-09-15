@@ -728,7 +728,7 @@ function initEmailConfirm(){
           window.alert('Não foi possível copiar o gráfico automaticamente (este navegador não suporta essa função).\n\nO e-mail vai abrir sem a imagem — cole ou anexe o gráfico manualmente antes de enviar, se precisar.');
         }
         openMailClient(row);
-        logPmEmailEvent(row.company, row.project, 'email_sent', null).then(function(){
+        logPmEmailEvent(row.company, row.project, 'email_sent', null, null, statusOf(row.spi)).then(function(){
           refreshPmEmailLogSummary().then(renderReminderAlert);
         });
         closeEmailConfirm(); // o diálogo ficava aberto atrás do alerta acima; fecha para liberar a tela (inclui "Lembrar PM")
@@ -922,15 +922,23 @@ var pmEmailLogSummary = {};
 async function refreshPmEmailLogSummary(){
   if (!supabaseClient) return;
   try {
-    var res = await supabaseClient.from('pm_email_log').select('project, kind, created_at').in('kind', ['reminder_sent', 'pm_reply']);
+    var res = await supabaseClient.from('pm_email_log').select('project, kind, created_at, spi_status').in('kind', ['email_sent', 'reminder_sent', 'pm_reply']);
     if (res.error) throw res.error;
     var summary = {};
     (res.data || []).forEach(function(ev){
-      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null });
+      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null, lastEmailSent: null, lastEmailSentStatus: null });
       if (ev.kind === 'reminder_sent'){
         if (!s.lastReminder || new Date(ev.created_at) > new Date(s.lastReminder)) s.lastReminder = ev.created_at;
       } else if (ev.kind === 'pm_reply'){
         if (!s.lastReply || new Date(ev.created_at) > new Date(s.lastReply)) s.lastReply = ev.created_at;
+      } else if (ev.kind === 'email_sent'){
+        // guarda o status do SPI congelado no momento deste envio — usado
+        // para não cobrar resposta de um e-mail que saiu com SPI Bom, ver
+        // projectsNeedingReminder.
+        if (!s.lastEmailSent || new Date(ev.created_at) > new Date(s.lastEmailSent)){
+          s.lastEmailSent = ev.created_at;
+          s.lastEmailSentStatus = ev.spi_status || null;
+        }
       }
     });
     pmEmailLogSummary = summary;
@@ -951,15 +959,21 @@ function projectsNeedingReminder(){
   var result = [];
   latestWeekRows().forEach(function(row){
     if (!row.email_sent_at || seen[row.project]) return;
-    // SPI "Bom" não gera cobrança de resposta (ver conversa sobre o fluxo de
-    // e-mails) — só reenvia o e-mail original se sair dessa faixa depois.
-    if (statusOf(row.spi) === 'good') return;
     seen[row.project] = true;
+    var summary = pmEmailLogSummary[row.project];
+    // SPI "Bom" não gera cobrança de resposta (ver conversa sobre o fluxo de
+    // e-mails) — o que importa é o SPI de QUANDO o e-mail foi enviado, não o
+    // de hoje (um projeto pode ter saído do "Bom" depois; nesse caso o certo
+    // é reenviar o e-mail original no próximo ciclo, não cobrar lembrete
+    // deste). lastEmailSentStatus vem congelado em logPmEmailEvent; na
+    // ausência dele (log antigo sem essa informação), cai para o SPI atual
+    // como aproximação.
+    var frozenStatus = summary && summary.lastEmailSentStatus ? summary.lastEmailSentStatus : statusOf(row.spi);
+    if (frozenStatus === 'good') return;
     var sentDate = new Date(row.email_sent_at);
     if (isNaN(sentDate.getTime())) return;
     var daysSince = Math.floor((now - sentDate) / dayMs);
     if (daysSince < 7) return;
-    var summary = pmEmailLogSummary[row.project];
     var lastReminder = summary && summary.lastReminder ? new Date(summary.lastReminder) : null;
     var lastReply = summary && summary.lastReply ? new Date(summary.lastReply) : null;
     if (lastReminder && lastReminder > sentDate) return; // já lembrou depois deste e-mail
@@ -1427,7 +1441,7 @@ async function loadData(){
    nome do projeto (mesma convenção já usada por pmNameForProject/
    pmEmailForProject), então o histórico sobrevive a avançar semana, editar
    ou até excluir um lançamento específico. */
-async function logPmEmailEvent(company, project, kind, note, createdAt){
+async function logPmEmailEvent(company, project, kind, note, createdAt, spiStatus){
   if (!supabaseClient) return;
   try {
     var payload = { company: company, project: project, kind: kind, note: note || null };
@@ -1435,6 +1449,12 @@ async function logPmEmailEvent(company, project, kind, note, createdAt){
     // do PM que chegou há alguns dias e só está sendo colada agora) — sem
     // passar isso, o banco usa a data/hora atual (now()) como sempre foi.
     if (createdAt) payload.created_at = createdAt;
+    // spiStatus (só usado em kind === 'email_sent') congela o status do SPI
+    // no momento do envio — projeto com SPI Bom nunca gera cobrança de
+    // resposta, mesmo que degrade depois; sem isso o aviso de "lembretes
+    // pendentes" ficaria julgando pelo SPI de HOJE, não pelo de quando o
+    // e-mail foi mandado (ver projectsNeedingReminder).
+    if (spiStatus) payload.spi_status = spiStatus;
     var insRes = await supabaseClient.from('pm_email_log').insert(payload);
     if (insRes.error) throw insRes.error;
   } catch (err) {
