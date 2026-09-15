@@ -862,6 +862,11 @@ function renderEmailHistoryList(entries){
 
 var emailHistoryProject = null;
 var emailHistoryCompany = null;
+function nowAsDatetimeLocalValue(){
+  var d = new Date();
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
 function mergeSyntheticEmailSentEntry(entries, row){
   // Lançamentos cujo e-mail original foi enviado antes deste histórico
   // existir não têm registro em pm_email_log para esse envio — mas a data
@@ -882,6 +887,8 @@ async function openEmailHistory(row){
   if (titleEl) titleEl.textContent = projectLabel(row);
   var replyEl = document.getElementById('emailHistoryReply');
   if (replyEl) replyEl.value = '';
+  var replyDateEl = document.getElementById('emailHistoryReplyDate');
+  if (replyDateEl) replyDateEl.value = nowAsDatetimeLocalValue();
   var list = document.getElementById('emailHistoryList');
   if (list) list.innerHTML = '<div class="history-empty">Carregando…</div>';
   var overlay = document.getElementById('emailHistoryOverlay');
@@ -909,9 +916,16 @@ function initEmailHistoryModal(){
     var text = replyEl ? replyEl.value.trim() : '';
     if (!text || !emailHistoryProject) return;
     var project = emailHistoryProject, company = emailHistoryCompany;
+    var dateEl = document.getElementById('emailHistoryReplyDate');
+    var createdAt = null;
+    if (dateEl && dateEl.value){
+      var parsedDate = new Date(dateEl.value);
+      if (!isNaN(parsedDate.getTime())) createdAt = parsedDate.toISOString();
+    }
     saveBtn.disabled = true;
-    await logPmEmailEvent(company, project, 'pm_reply', text);
+    await logPmEmailEvent(company, project, 'pm_reply', text, createdAt);
     if (replyEl) replyEl.value = '';
+    if (dateEl) dateEl.value = nowAsDatetimeLocalValue();
     var entries = await fetchPmEmailHistory(project);
     if (emailHistoryProject === project) renderEmailHistoryList(entries);
     saveBtn.disabled = false;
@@ -1233,12 +1247,15 @@ async function loadData(){
    nome do projeto (mesma convenção já usada por pmNameForProject/
    pmEmailForProject), então o histórico sobrevive a avançar semana, editar
    ou até excluir um lançamento específico. */
-async function logPmEmailEvent(company, project, kind, note){
+async function logPmEmailEvent(company, project, kind, note, createdAt){
   if (!supabaseClient) return;
   try {
-    var insRes = await supabaseClient.from('pm_email_log').insert({
-      company: company, project: project, kind: kind, note: note || null
-    });
+    var payload = { company: company, project: project, kind: kind, note: note || null };
+    // createdAt permite registrar um evento com data retroativa (ex.: resposta
+    // do PM que chegou há alguns dias e só está sendo colada agora) — sem
+    // passar isso, o banco usa a data/hora atual (now()) como sempre foi.
+    if (createdAt) payload.created_at = createdAt;
+    var insRes = await supabaseClient.from('pm_email_log').insert(payload);
     if (insRes.error) throw insRes.error;
   } catch (err) {
     showToast('Não foi possível registrar esse evento no histórico de e-mails.', 'warn');
