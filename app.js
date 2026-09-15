@@ -862,6 +862,19 @@ function renderEmailHistoryList(entries){
 
 var emailHistoryProject = null;
 var emailHistoryCompany = null;
+function mergeSyntheticEmailSentEntry(entries, row){
+  // Lançamentos cujo e-mail original foi enviado antes deste histórico
+  // existir não têm registro em pm_email_log para esse envio — mas a data
+  // já era guardada em email_sent_at (ver "Lembrar PM"). Se ainda não há um
+  // evento "email_sent" na lista, completa com essa data para não perder o
+  // início da linha do tempo.
+  var hasEmailSent = entries.some(function(ev){ return ev.kind === 'email_sent'; });
+  if (!hasEmailSent && row.email_sent_at){
+    entries = entries.concat([{ kind: 'email_sent', created_at: row.email_sent_at, note: null }]);
+    entries.sort(function(a, b){ return new Date(a.created_at) - new Date(b.created_at); });
+  }
+  return entries;
+}
 async function openEmailHistory(row){
   emailHistoryProject = row.project;
   emailHistoryCompany = row.company;
@@ -874,6 +887,7 @@ async function openEmailHistory(row){
   var overlay = document.getElementById('emailHistoryOverlay');
   if (overlay) overlay.hidden = false;
   var entries = await fetchPmEmailHistory(row.project);
+  entries = mergeSyntheticEmailSentEntry(entries, row);
   if (emailHistoryProject === row.project) renderEmailHistoryList(entries);
 }
 function closeEmailHistory(){
