@@ -401,6 +401,26 @@ table.mini-table tbody tr:hover td{ background: transparent; }
   font-size:12.5px; color: var(--text-secondary); white-space:pre-wrap; line-height:1.5; margin: -8px 0 18px;
   max-height:220px; overflow-y:auto;
 }
+
+/* histórico de e-mails ao PM (botão "Histórico de e-mails" + modal) */
+.history-list{ max-height:280px; overflow-y:auto; margin-bottom:16px; }
+.history-item{ padding:10px 0; border-bottom:1px solid var(--hairline); }
+.history-item:last-child{ border-bottom:none; }
+.history-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.history-kind{ font-weight:600; font-size:12.5px; }
+.history-kind.sent{ color: var(--accent); }
+.history-kind.reminder{ color: var(--status-warning-text); }
+.history-kind.reply{ color: var(--status-good); }
+.history-date{ font-size:11px; color: var(--text-muted); white-space:nowrap; }
+.history-note{ margin-top:6px; font-size:12.5px; color: var(--text-secondary); white-space:pre-wrap; line-height:1.5; }
+.history-empty{ text-align:center; color: var(--text-muted); padding:20px 0; font-size:13px; }
+textarea.reply-input{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:13px; color: var(--text-primary);
+  background: var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px;
+  width:100%; resize:vertical;
+}
+textarea.reply-input:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+
 .confirm-actions{ display:flex; justify-content:flex-end; gap:10px; }
 .modal{
   background: var(--surface-1); border:1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow);
@@ -671,6 +691,7 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       <div class="table-head-actions" id="tableHeadActions">
         <button type="button" class="btn ghost small" id="btnEmailHead" disabled title="Clique no nome de um projeto na tabela para selecioná-lo">Enviar e-mail ao PM</button>
         <button type="button" class="btn ghost small" id="btnRemindHead" disabled title="Clique no nome de um projeto na tabela para selecioná-lo">Lembrar PM</button>
+        <button type="button" class="btn ghost small" id="btnEmailHistoryHead" disabled title="Clique no nome de um projeto na tabela para selecioná-lo">Histórico de e-mails</button>
         <button type="button" class="btn primary small" id="btnAdd">+ Novo lançamento</button>
       </div>
     </div>
@@ -854,6 +875,28 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     <div class="confirm-actions">
       <button type="button" class="btn ghost" id="remindConfirmNo">Cancelar</button>
       <button type="button" class="btn primary" id="remindConfirmYes">Sim, gerar lembrete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="emailHistoryOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="emailHistoryTitle">
+    <div class="modal-head">
+      <div class="modal-title" id="emailHistoryTitle">Histórico de e-mails &mdash; <span id="emailHistoryProject"></span></div>
+      <button type="button" class="modal-close" id="emailHistoryClose" aria-label="Fechar">&times;</button>
+    </div>
+    <p class="modal-sub">E-mails e lembretes enviados ao PM, e respostas registradas manualmente.</p>
+    <div class="history-list" id="emailHistoryList"></div>
+    <div class="form-field span2">
+      <label for="emailHistoryReply">Colar resposta do PM</label>
+      <textarea class="reply-input" id="emailHistoryReply" rows="4" placeholder="Cole aqui o texto da resposta recebida por e-mail..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <div></div>
+      <div class="modal-actions-right">
+        <button type="button" class="btn ghost" id="emailHistoryCloseBtn">Fechar</button>
+        <button type="button" class="btn primary" id="btnSavePmReply">Salvar resposta</button>
+      </div>
     </div>
   </div>
 </div>

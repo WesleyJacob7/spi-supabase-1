@@ -728,6 +728,7 @@ function initEmailConfirm(){
           window.alert('Não foi possível copiar o gráfico automaticamente (este navegador não suporta essa função).\n\nO e-mail vai abrir sem a imagem — cole ou anexe o gráfico manualmente antes de enviar, se precisar.');
         }
         openMailClient(row);
+        logPmEmailEvent(row.company, row.project, 'email_sent', null);
         closeEmailConfirm(); // o diálogo ficava aberto atrás do alerta acima; fecha para liberar a tela (inclui "Lembrar PM")
         // marca este lançamento como "1º e-mail enviado" — é o que habilita
         // o botão "Lembrar PM" para ele (ver render() e email_sent_at em
@@ -792,6 +793,7 @@ function initRemindConfirm(){
     var row = pendingRemindRow;
     if (!row){ closeRemindConfirm(); return; }
     var body = buildReminderBody(row);
+    logPmEmailEvent(row.company, row.project, 'reminder_sent', null);
     copyTextToClipboard(body).then(function(copied){
       if (copied){
         closeRemindConfirm();
@@ -803,6 +805,106 @@ function initRemindConfirm(){
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeRemindConfirm(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeRemindConfirm(); });
+}
+
+/* ---------- modal "Histórico de e-mails" ----------
+   Mostra, para o projeto selecionado, a linha do tempo gravada em
+   pm_email_log (e-mail enviado / lembrete enviado / resposta do PM) e
+   permite colar uma nova resposta do PM, criando o histórico de
+   justificativas pedido. */
+var pmHistoryKindLabel = {
+  email_sent: 'E-mail de acompanhamento enviado',
+  reminder_sent: 'Lembrete enviado',
+  pm_reply: 'Resposta do PM'
+};
+function formatHistoryDate(iso){
+  try {
+    var d = new Date(iso);
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch (e){
+    return iso || '';
+  }
+}
+function renderEmailHistoryList(entries){
+  var list = document.getElementById('emailHistoryList');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!entries.length){
+    var empty = document.createElement('div');
+    empty.className = 'history-empty';
+    empty.textContent = 'Nenhum e-mail, lembrete ou resposta registrado ainda para este projeto.';
+    list.appendChild(empty);
+    return;
+  }
+  entries.forEach(function(ev){
+    var item = document.createElement('div');
+    item.className = 'history-item';
+    var head = document.createElement('div');
+    head.className = 'history-head';
+    var kindEl = document.createElement('span');
+    kindEl.className = 'history-kind ' + (ev.kind === 'pm_reply' ? 'reply' : (ev.kind === 'reminder_sent' ? 'reminder' : 'sent'));
+    kindEl.textContent = pmHistoryKindLabel[ev.kind] || ev.kind;
+    head.appendChild(kindEl);
+    var dateEl = document.createElement('span');
+    dateEl.className = 'history-date';
+    dateEl.textContent = formatHistoryDate(ev.created_at);
+    head.appendChild(dateEl);
+    item.appendChild(head);
+    if (ev.note){
+      var noteEl = document.createElement('div');
+      noteEl.className = 'history-note';
+      noteEl.textContent = ev.note;
+      item.appendChild(noteEl);
+    }
+    list.appendChild(item);
+  });
+}
+
+var emailHistoryProject = null;
+var emailHistoryCompany = null;
+async function openEmailHistory(row){
+  emailHistoryProject = row.project;
+  emailHistoryCompany = row.company;
+  var titleEl = document.getElementById('emailHistoryProject');
+  if (titleEl) titleEl.textContent = projectLabel(row);
+  var replyEl = document.getElementById('emailHistoryReply');
+  if (replyEl) replyEl.value = '';
+  var list = document.getElementById('emailHistoryList');
+  if (list) list.innerHTML = '<div class="history-empty">Carregando…</div>';
+  var overlay = document.getElementById('emailHistoryOverlay');
+  if (overlay) overlay.hidden = false;
+  var entries = await fetchPmEmailHistory(row.project);
+  if (emailHistoryProject === row.project) renderEmailHistoryList(entries);
+}
+function closeEmailHistory(){
+  var overlay = document.getElementById('emailHistoryOverlay');
+  if (overlay) overlay.hidden = true;
+  emailHistoryProject = null;
+  emailHistoryCompany = null;
+}
+function initEmailHistoryModal(){
+  var overlay = document.getElementById('emailHistoryOverlay');
+  if (!overlay) return;
+  var closeBtn = document.getElementById('emailHistoryClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeEmailHistory);
+  var closeBtn2 = document.getElementById('emailHistoryCloseBtn');
+  if (closeBtn2) closeBtn2.addEventListener('click', closeEmailHistory);
+  var saveBtn = document.getElementById('btnSavePmReply');
+  if (saveBtn) saveBtn.addEventListener('click', async function(){
+    var replyEl = document.getElementById('emailHistoryReply');
+    var text = replyEl ? replyEl.value.trim() : '';
+    if (!text || !emailHistoryProject) return;
+    var project = emailHistoryProject, company = emailHistoryCompany;
+    saveBtn.disabled = true;
+    await logPmEmailEvent(company, project, 'pm_reply', text);
+    if (replyEl) replyEl.value = '';
+    var entries = await fetchPmEmailHistory(project);
+    if (emailHistoryProject === project) renderEmailHistoryList(entries);
+    saveBtn.disabled = false;
+    showToast('Resposta do PM registrada no histórico.', '');
+  });
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) closeEmailHistory(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeEmailHistory(); });
 }
 
 function weekLabelFromInputValue(v){
@@ -1103,6 +1205,40 @@ async function loadData(){
   } catch (e) {
     showToast('Não foi possível carregar os dados do Supabase.', 'error');
     DATA = [];
+  }
+}
+
+/* ---------- histórico de e-mails ao PM (tabela pm_email_log) ----------
+   Registra, por projeto, cada e-mail de acompanhamento enviado, cada
+   lembrete enviado, e a resposta do PM colada manualmente — para montar um
+   histórico de "cobrança + justificativa" sem depender da caixa de e-mail.
+   É uma tabela independente de spi_records, gravada direto a cada evento
+   (não passa por persistState(), que apaga e reinsere spi_records inteira a
+   cada lançamento salvo — se o histórico dependesse disso, seria perdido a
+   cada save). Por isso também não tem FK para spi_records: a chave é só o
+   nome do projeto (mesma convenção já usada por pmNameForProject/
+   pmEmailForProject), então o histórico sobrevive a avançar semana, editar
+   ou até excluir um lançamento específico. */
+async function logPmEmailEvent(company, project, kind, note){
+  if (!supabaseClient) return;
+  try {
+    var insRes = await supabaseClient.from('pm_email_log').insert({
+      company: company, project: project, kind: kind, note: note || null
+    });
+    if (insRes.error) throw insRes.error;
+  } catch (err) {
+    showToast('Não foi possível registrar esse evento no histórico de e-mails.', 'warn');
+  }
+}
+async function fetchPmEmailHistory(project){
+  if (!supabaseClient) return [];
+  try {
+    var res = await supabaseClient.from('pm_email_log').select('*').eq('project', project).order('created_at', { ascending: true });
+    if (res.error) throw res.error;
+    return res.data || [];
+  } catch (err) {
+    showToast('Não foi possível carregar o histórico de e-mails.', 'error');
+    return [];
   }
 }
 
@@ -2503,6 +2639,11 @@ function render(){
       btnRemindHead.title = 'Enviar lembrete de retorno de SPI para ' + projectLabel(isolatedRow);
     }
   }
+  var btnEmailHistoryHead = document.getElementById('btnEmailHistoryHead');
+  if (btnEmailHistoryHead){
+    btnEmailHistoryHead.disabled = !isolatedRow;
+    btnEmailHistoryHead.title = isolatedRow ? 'Ver histórico de e-mails/lembretes/respostas de ' + projectLabel(isolatedRow) : 'Clique no nome de um projeto na tabela para selecioná-lo';
+  }
 
   var withSpi = rows.filter(function(d){ return typeof d.spi === 'number' && d.pct_complete > 0; });
   // SPI Global = Σ Duração Base / Σ Duração Programada (ponderado pelo porte de cada
@@ -2849,6 +2990,12 @@ function initFormListeners(){
     var row = currentRows().find(function(d){ return d.project === state.isolatedProject; });
     if (row && row.email_sent_at) openRemindConfirm(row);
   });
+  var btnEmailHistoryHead = document.getElementById('btnEmailHistoryHead');
+  if (btnEmailHistoryHead) btnEmailHistoryHead.addEventListener('click', function(){
+    if (!state.isolatedProject) return;
+    var row = currentRows().find(function(d){ return d.project === state.isolatedProject; });
+    if (row) openEmailHistory(row);
+  });
   document.getElementById('modalClose').addEventListener('click', closeModal);
   document.getElementById('btnCancel').addEventListener('click', closeModal);
   document.getElementById('modalOverlay').addEventListener('click', function(e){
@@ -3019,6 +3166,7 @@ async function boot(){
   renderLegend();
   initEmailConfirm();
   initRemindConfirm();
+  initEmailHistoryModal();
   initExcludeConfirm();
   initAdvanceConfirm();
   initDeleteWeekConfirm();
