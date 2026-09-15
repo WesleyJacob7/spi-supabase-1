@@ -214,6 +214,10 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
   padding: 16px 20px 18px; border-color: var(--status-warning-mark);
   background: var(--status-warning-wash);
 }
+/* sem nada acionável agora (só a lista "SPI bom no envio", recolhida) — fica
+   discreto em vez de chamar atenção com a cor de aviso o tempo todo */
+.reminder-alert-card.no-action{ border-color: var(--border); background: var(--surface-1); }
+.reminder-alert-card.no-action .reminder-alert-title{ color: var(--text-primary); }
 .reminder-alert-head{ margin-bottom: 10px; }
 .reminder-alert-title{
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:15px;
@@ -232,8 +236,13 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
 .reminder-alert-secondary-title{
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; font-size:12px;
   text-transform:uppercase; letter-spacing:.05em; color: var(--text-muted);
+  cursor:pointer; user-select:none; list-style:none;
 }
-.reminder-alert-secondary-sub{ font-size:12px; color: var(--text-muted); margin: 3px 0 10px; }
+.reminder-alert-secondary-title::-webkit-details-marker{ display:none; }
+.reminder-alert-secondary-title::before{ content:"▸ "; }
+details[open] > .reminder-alert-secondary-title::before{ content:"▾ "; }
+.reminder-alert-secondary-title:hover{ color: var(--text-primary); }
+.reminder-alert-secondary-sub{ font-size:12px; color: var(--text-muted); margin: 6px 0 10px; }
 .reminder-alert-list.muted .reminder-alert-item{ opacity:.8; }
 .reminder-alert-list.muted .reminder-alert-project{ font-weight:500; }
 .card-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size: 19px; letter-spacing:-0.005em; }
@@ -638,11 +647,11 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       <p class="reminder-alert-sub">E-mail original enviado há 7 dias ou mais, sem lembrete nem resposta do PM registrados depois disso.</p>
     </div>
     <div class="reminder-alert-list" id="reminderAlertList"></div>
-    <div class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
-      <div class="reminder-alert-secondary-title">Sem lembrete necessário (SPI bom no envio)</div>
+    <details class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
+      <summary class="reminder-alert-secondary-title" id="reminderAlertGoodTitle">Sem lembrete necessário (SPI bom no envio)</summary>
       <p class="reminder-alert-secondary-sub">Também com e-mail enviado há 7 dias ou mais, mas sem o botão "Lembrar PM" porque o SPI estava bom quando o e-mail original foi mandado.</p>
       <div class="reminder-alert-list muted" id="reminderAlertGoodList"></div>
-    </div>
+    </details>
   </div>
 
   <div class="filters fade-in d1">
