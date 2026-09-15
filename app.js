@@ -967,6 +967,32 @@ async function refreshPmEmailLogSummary(){
     // (ex.: offline), simplesmente não mostra nada, sem travar o resto.
   }
 }
+// Para logs antigos de e-mail (anteriores às colunas spi_value/ref_date em
+// pm_email_log, ou vindos do backfill da planilha), não dá pra saber o SPI/
+// data de referência exatos gravados no momento do envio. Em vez de cair pro
+// SPI/data ATUAIS do projeto (que já podem ter mudado bastante desde então,
+// gerando uma linha incoerente tipo "SPI bom no envio" mostrando um SPI
+// atual abaixo de 1), busca no próprio histórico de lançamentos (DATA) o
+// registro mais recente com data <= data do envio — ou seja, o relatório que
+// estava "valendo" quando aquele e-mail foi mandado.
+function projectRowsAll(project){
+  return DATA.filter(function(d){ return d.project === project; }).sort(function(a, b){
+    return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
+  });
+}
+function historicalRowAtOrBefore(project, atDate){
+  var rows = projectRowsAll(project);
+  if (!rows.length) return null;
+  var target = new Date(atDate);
+  var chosen = null;
+  for (var i = 0; i < rows.length; i++){
+    var d = new Date(rows[i].date);
+    if (isNaN(d.getTime())) continue;
+    if (d <= target){ chosen = rows[i]; } else { break; }
+  }
+  if (!chosen) chosen = rows[0]; // e-mail enviado antes de qualquer lançamento salvo — usa o mais antigo como aproximação
+  return chosen;
+}
 function latestWeekRows(){
   if (!weeks.length) return [];
   var latest = weeks[weeks.length - 1];
@@ -1003,8 +1029,18 @@ function reminderAlertLists(){
     if (lastReminder && lastReminder > sentDate) return; // já lembrou depois deste e-mail
     if (lastReply && lastReply > sentDate) return; // já tem resposta depois deste e-mail
     if (frozenStatus === 'good'){
-      var frozenSpiValue = (summary && typeof summary.lastEmailSentSpiValue === 'number') ? summary.lastEmailSentSpiValue : row.spi;
-      var frozenRefDate = (summary && summary.lastEmailSentRefDate) ? summary.lastEmailSentRefDate : row.date;
+      var frozenSpiValue, frozenRefDate;
+      if (summary && typeof summary.lastEmailSentSpiValue === 'number' && summary.lastEmailSentRefDate){
+        frozenSpiValue = summary.lastEmailSentSpiValue;
+        frozenRefDate = summary.lastEmailSentRefDate;
+      } else {
+        // log antigo sem spi_value/ref_date gravados — busca no histórico do
+        // projeto o lançamento que valia na data em que ESTE e-mail foi
+        // enviado (sentDate), em vez do lançamento atual/mais recente.
+        var histRow = historicalRowAtOrBefore(row.project, sentDate);
+        frozenSpiValue = histRow ? histRow.spi : row.spi;
+        frozenRefDate = histRow ? histRow.date : row.date;
+      }
       goodAtSend.push({ row: row, daysSince: daysSince, spiValue: frozenSpiValue, refDate: frozenRefDate });
     } else {
       needsReminder.push({ row: row, daysSince: daysSince });
