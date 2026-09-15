@@ -1068,13 +1068,13 @@ function renderReminderAlert(){
   // só a lista "SPI bom no envio" some por baixo de um resumo recolhido,
   // em vez de ocupar a tela toda hora sem ter o que fazer.
   card.classList.toggle('no-action', !lists.needsReminder.length);
-  renderReminderAlertItems(list, lists.needsReminder, true, 'Nenhum lembrete pendente no momento.');
+  renderReminderAlertItems(list, lists.needsReminder, true, 'Tudo em dia — nenhum projeto precisa de lembrete agora.');
   if (goodSection && goodList){
     goodSection.hidden = !lists.goodAtSend.length;
     var goodTitle = document.getElementById('reminderAlertGoodTitle');
     if (goodTitle){
-      goodTitle.textContent = 'Sem lembrete necessário (SPI bom no envio) — ' +
-        lists.goodAtSend.length + (lists.goodAtSend.length === 1 ? ' projeto' : ' projetos');
+      var n = lists.goodAtSend.length;
+      goodTitle.textContent = n + (n === 1 ? ' projeto não precisa' : ' projetos não precisam') + ' de lembrete (SPI bom no envio)';
     }
     renderReminderAlertItems(goodList, lists.goodAtSend, false, null);
   }

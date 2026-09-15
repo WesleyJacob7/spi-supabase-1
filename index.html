@@ -234,8 +234,8 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
 .reminder-alert-days{ font-size:11.5px; color: var(--text-muted); }
 .reminder-alert-secondary{ margin-top:16px; padding-top:14px; border-top:1px dashed var(--border); }
 .reminder-alert-secondary-title{
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; font-size:12px;
-  text-transform:uppercase; letter-spacing:.05em; color: var(--text-muted);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; font-size:13px;
+  color: var(--text-muted);
   cursor:pointer; user-select:none; list-style:none;
 }
 .reminder-alert-secondary-title::-webkit-details-marker{ display:none; }
@@ -644,12 +644,12 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   <div class="card reminder-alert-card fade-in" id="reminderAlertCard" hidden>
     <div class="reminder-alert-head">
       <div class="reminder-alert-title">Lembretes pendentes</div>
-      <p class="reminder-alert-sub">E-mail original enviado há 7 dias ou mais, sem lembrete nem resposta do PM registrados depois disso.</p>
+      <p class="reminder-alert-sub">Projetos com e-mail enviado há mais de 1 semana, ainda sem lembrete nem resposta do PM.</p>
     </div>
     <div class="reminder-alert-list" id="reminderAlertList"></div>
     <details class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
       <summary class="reminder-alert-secondary-title" id="reminderAlertGoodTitle">Sem lembrete necessário (SPI bom no envio)</summary>
-      <p class="reminder-alert-secondary-sub">Também com e-mail enviado há 7 dias ou mais, mas sem o botão "Lembrar PM" porque o SPI estava bom quando o e-mail original foi mandado.</p>
+      <p class="reminder-alert-secondary-sub">Esses projetos também estão há mais de 1 semana sem contato, mas o SPI já estava bom quando o e-mail foi enviado — por isso não têm o botão "Lembrar PM".</p>
       <div class="reminder-alert-list muted" id="reminderAlertGoodList"></div>
     </details>
   </div>
