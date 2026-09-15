@@ -728,7 +728,9 @@ function initEmailConfirm(){
           window.alert('Não foi possível copiar o gráfico automaticamente (este navegador não suporta essa função).\n\nO e-mail vai abrir sem a imagem — cole ou anexe o gráfico manualmente antes de enviar, se precisar.');
         }
         openMailClient(row);
-        logPmEmailEvent(row.company, row.project, 'email_sent', null);
+        logPmEmailEvent(row.company, row.project, 'email_sent', null).then(function(){
+          refreshPmEmailLogSummary().then(renderReminderAlert);
+        });
         closeEmailConfirm(); // o diálogo ficava aberto atrás do alerta acima; fecha para liberar a tela (inclui "Lembrar PM")
         // marca este lançamento como "1º e-mail enviado" — é o que habilita
         // o botão "Lembrar PM" para ele (ver render() e email_sent_at em
@@ -793,7 +795,9 @@ function initRemindConfirm(){
     var row = pendingRemindRow;
     if (!row){ closeRemindConfirm(); return; }
     var body = buildReminderBody(row);
-    logPmEmailEvent(row.company, row.project, 'reminder_sent', null);
+    logPmEmailEvent(row.company, row.project, 'reminder_sent', null).then(function(){
+      refreshPmEmailLogSummary().then(renderReminderAlert);
+    });
     copyTextToClipboard(body).then(function(copied){
       if (copied){
         closeRemindConfirm();
@@ -824,6 +828,12 @@ function formatHistoryDate(iso){
   } catch (e){
     return iso || '';
   }
+}
+function dateValueFromIso(iso){
+  // extrai só a parte YYYY-MM-DD (formato aceito por <input type="date">)
+  var s = String(iso || '');
+  var m = /^(\d{4}-\d{2}-\d{2})/.exec(s);
+  return m ? m[1] : '';
 }
 function renderEmailHistoryList(entries){
   var list = document.getElementById('emailHistoryList');
@@ -856,12 +866,34 @@ function renderEmailHistoryList(entries){
       noteEl.textContent = ev.note;
       item.appendChild(noteEl);
     }
+    // só dá pra editar/excluir uma resposta do PM que realmente é um
+    // registro salvo (tem id) — a entrada sintética de "e-mail enviado"
+    // (ver mergeSyntheticEmailSentEntry) não tem id e nunca é pm_reply.
+    if (ev.kind === 'pm_reply' && ev.id != null){
+      var actions = document.createElement('div');
+      actions.className = 'history-actions';
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'history-action-btn';
+      editBtn.textContent = 'Editar';
+      editBtn.addEventListener('click', function(){ startEditPmReply(ev); });
+      actions.appendChild(editBtn);
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'history-action-btn danger';
+      delBtn.textContent = 'Excluir';
+      delBtn.addEventListener('click', function(){ deletePmReply(ev.id); });
+      actions.appendChild(delBtn);
+      item.appendChild(actions);
+    }
     list.appendChild(item);
   });
 }
 
 var emailHistoryProject = null;
 var emailHistoryCompany = null;
+var emailHistoryRow = null;
+var emailHistoryEditingId = null;
 function nowAsDateValue(){
   var d = new Date();
   var pad = function(n){ return String(n).padStart(2, '0'); };
@@ -880,28 +912,165 @@ function mergeSyntheticEmailSentEntry(entries, row){
   }
   return entries;
 }
+/* ---------- aviso "lembretes pendentes" (painel do Wesley) ----------
+   Mostra, no topo do painel admin, os projetos cujo e-mail original foi
+   enviado há 7+ dias sem lembrete e sem resposta do PM registrados desde
+   então — para não depender de ele lembrar de checar caso a caso. Só faz
+   sentido na visão admin (index.html); nas visões JKA/Prestige o elemento
+   nem existe no HTML. */
+var pmEmailLogSummary = {};
+async function refreshPmEmailLogSummary(){
+  if (!supabaseClient) return;
+  try {
+    var res = await supabaseClient.from('pm_email_log').select('project, kind, created_at').in('kind', ['reminder_sent', 'pm_reply']);
+    if (res.error) throw res.error;
+    var summary = {};
+    (res.data || []).forEach(function(ev){
+      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null });
+      if (ev.kind === 'reminder_sent'){
+        if (!s.lastReminder || new Date(ev.created_at) > new Date(s.lastReminder)) s.lastReminder = ev.created_at;
+      } else if (ev.kind === 'pm_reply'){
+        if (!s.lastReply || new Date(ev.created_at) > new Date(s.lastReply)) s.lastReply = ev.created_at;
+      }
+    });
+    pmEmailLogSummary = summary;
+  } catch (err) {
+    // o aviso de lembrete é um "bônus" do painel — se essa consulta falhar
+    // (ex.: offline), simplesmente não mostra nada, sem travar o resto.
+  }
+}
+function latestWeekRows(){
+  if (!weeks.length) return [];
+  var latest = weeks[weeks.length - 1];
+  return DATA.filter(function(d){ return d.week === latest && !excludedProjects.has(d.project); });
+}
+function projectsNeedingReminder(){
+  var now = new Date();
+  var dayMs = 24 * 60 * 60 * 1000;
+  var seen = {};
+  var result = [];
+  latestWeekRows().forEach(function(row){
+    if (!row.email_sent_at || seen[row.project]) return;
+    // SPI "Bom" não gera cobrança de resposta (ver conversa sobre o fluxo de
+    // e-mails) — só reenvia o e-mail original se sair dessa faixa depois.
+    if (statusOf(row.spi) === 'good') return;
+    seen[row.project] = true;
+    var sentDate = new Date(row.email_sent_at);
+    if (isNaN(sentDate.getTime())) return;
+    var daysSince = Math.floor((now - sentDate) / dayMs);
+    if (daysSince < 7) return;
+    var summary = pmEmailLogSummary[row.project];
+    var lastReminder = summary && summary.lastReminder ? new Date(summary.lastReminder) : null;
+    var lastReply = summary && summary.lastReply ? new Date(summary.lastReply) : null;
+    if (lastReminder && lastReminder > sentDate) return; // já lembrou depois deste e-mail
+    if (lastReply && lastReply > sentDate) return; // já tem resposta depois deste e-mail
+    result.push({ row: row, daysSince: daysSince });
+  });
+  result.sort(function(a, b){ return b.daysSince - a.daysSince; });
+  return result;
+}
+function renderReminderAlert(){
+  var card = document.getElementById('reminderAlertCard');
+  var list = document.getElementById('reminderAlertList');
+  if (!card || !list) return;
+  var items = projectsNeedingReminder();
+  if (!items.length){
+    card.hidden = true;
+    list.innerHTML = '';
+    return;
+  }
+  card.hidden = false;
+  list.innerHTML = '';
+  items.forEach(function(entry){
+    var row = entry.row;
+    var line = document.createElement('div');
+    line.className = 'reminder-alert-item';
+    var info = document.createElement('div');
+    info.className = 'reminder-alert-info';
+    var name = document.createElement('span');
+    name.className = 'reminder-alert-project';
+    name.textContent = projectLabel(row);
+    info.appendChild(name);
+    var days = document.createElement('span');
+    days.className = 'reminder-alert-days';
+    days.textContent = 'e-mail enviado há ' + entry.daysSince + ' dias, sem resposta registrada';
+    info.appendChild(days);
+    line.appendChild(info);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn ghost small';
+    btn.textContent = 'Lembrar PM';
+    btn.addEventListener('click', function(){ openRemindConfirm(row); });
+    line.appendChild(btn);
+    list.appendChild(line);
+  });
+}
+async function refreshEmailHistory(){
+  if (!emailHistoryProject) return;
+  var project = emailHistoryProject;
+  var entries = await fetchPmEmailHistory(project);
+  entries = mergeSyntheticEmailSentEntry(entries, emailHistoryRow || {});
+  if (emailHistoryProject === project) renderEmailHistoryList(entries);
+  // uma resposta salva/editada/excluída pode tirar (ou não) este projeto do
+  // aviso de "lembretes pendentes" no topo do painel — atualiza também.
+  refreshPmEmailLogSummary().then(renderReminderAlert);
+}
+function cancelEditPmReply(){
+  emailHistoryEditingId = null;
+  var replyEl = document.getElementById('emailHistoryReply');
+  if (replyEl) replyEl.value = '';
+  var dateEl = document.getElementById('emailHistoryReplyDate');
+  if (dateEl) dateEl.value = nowAsDateValue();
+  var saveBtn = document.getElementById('btnSavePmReply');
+  if (saveBtn) saveBtn.textContent = 'Salvar resposta';
+  var cancelBtn = document.getElementById('emailHistoryCancelEdit');
+  if (cancelBtn) cancelBtn.hidden = true;
+}
+function startEditPmReply(ev){
+  var replyEl = document.getElementById('emailHistoryReply');
+  if (replyEl) replyEl.value = ev.note || '';
+  var dateEl = document.getElementById('emailHistoryReplyDate');
+  if (dateEl) dateEl.value = dateValueFromIso(ev.created_at) || nowAsDateValue();
+  emailHistoryEditingId = ev.id;
+  var saveBtn = document.getElementById('btnSavePmReply');
+  if (saveBtn) saveBtn.textContent = 'Atualizar resposta';
+  var cancelBtn = document.getElementById('emailHistoryCancelEdit');
+  if (cancelBtn) cancelBtn.hidden = false;
+  if (replyEl) replyEl.focus();
+}
+async function deletePmReply(id){
+  if (!supabaseClient || id == null) return;
+  if (!window.confirm('Excluir esta resposta do histórico? Essa ação não pode ser desfeita.')) return;
+  try {
+    var delRes = await supabaseClient.from('pm_email_log').delete().eq('id', id);
+    if (delRes.error) throw delRes.error;
+    if (emailHistoryEditingId === id) cancelEditPmReply();
+    await refreshEmailHistory();
+    showToast('Resposta removida do histórico.', '');
+  } catch (err) {
+    showToast('Não foi possível excluir esse registro.', 'error');
+  }
+}
 async function openEmailHistory(row){
   emailHistoryProject = row.project;
   emailHistoryCompany = row.company;
+  emailHistoryRow = row;
+  cancelEditPmReply();
   var titleEl = document.getElementById('emailHistoryProject');
   if (titleEl) titleEl.textContent = projectLabel(row);
-  var replyEl = document.getElementById('emailHistoryReply');
-  if (replyEl) replyEl.value = '';
-  var replyDateEl = document.getElementById('emailHistoryReplyDate');
-  if (replyDateEl) replyDateEl.value = nowAsDateValue();
   var list = document.getElementById('emailHistoryList');
   if (list) list.innerHTML = '<div class="history-empty">Carregando…</div>';
   var overlay = document.getElementById('emailHistoryOverlay');
   if (overlay) overlay.hidden = false;
-  var entries = await fetchPmEmailHistory(row.project);
-  entries = mergeSyntheticEmailSentEntry(entries, row);
-  if (emailHistoryProject === row.project) renderEmailHistoryList(entries);
+  await refreshEmailHistory();
 }
 function closeEmailHistory(){
   var overlay = document.getElementById('emailHistoryOverlay');
   if (overlay) overlay.hidden = true;
+  cancelEditPmReply();
   emailHistoryProject = null;
   emailHistoryCompany = null;
+  emailHistoryRow = null;
 }
 function initEmailHistoryModal(){
   var overlay = document.getElementById('emailHistoryOverlay');
@@ -910,11 +1079,17 @@ function initEmailHistoryModal(){
   if (closeBtn) closeBtn.addEventListener('click', closeEmailHistory);
   var closeBtn2 = document.getElementById('emailHistoryCloseBtn');
   if (closeBtn2) closeBtn2.addEventListener('click', closeEmailHistory);
+  var cancelEditBtn = document.getElementById('emailHistoryCancelEdit');
+  if (cancelEditBtn) cancelEditBtn.addEventListener('click', cancelEditPmReply);
   var saveBtn = document.getElementById('btnSavePmReply');
   if (saveBtn) saveBtn.addEventListener('click', async function(){
     var replyEl = document.getElementById('emailHistoryReply');
     var text = replyEl ? replyEl.value.trim() : '';
-    if (!text || !emailHistoryProject) return;
+    if (!emailHistoryProject) return;
+    if (!text){
+      showToast('Escreva o texto da resposta antes de salvar.', 'warn');
+      return;
+    }
     var project = emailHistoryProject, company = emailHistoryCompany;
     var dateEl = document.getElementById('emailHistoryReplyDate');
     var createdAt = null;
@@ -923,14 +1098,18 @@ function initEmailHistoryModal(){
       var parsedDate = new Date(dateEl.value + 'T12:00:00');
       if (!isNaN(parsedDate.getTime())) createdAt = parsedDate.toISOString();
     }
+    var editingId = emailHistoryEditingId;
     saveBtn.disabled = true;
-    await logPmEmailEvent(company, project, 'pm_reply', text, createdAt);
-    if (replyEl) replyEl.value = '';
-    if (dateEl) dateEl.value = nowAsDateValue();
-    var entries = await fetchPmEmailHistory(project);
-    if (emailHistoryProject === project) renderEmailHistoryList(entries);
+    if (editingId != null){
+      var ok = await updatePmEmailEvent(editingId, text, createdAt);
+      if (ok) showToast('Resposta do PM atualizada.', '');
+    } else {
+      await logPmEmailEvent(company, project, 'pm_reply', text, createdAt);
+      showToast('Resposta do PM registrada no histórico.', '');
+    }
+    cancelEditPmReply();
+    await refreshEmailHistory();
     saveBtn.disabled = false;
-    showToast('Resposta do PM registrada no histórico.', '');
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeEmailHistory(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeEmailHistory(); });
@@ -1260,6 +1439,21 @@ async function logPmEmailEvent(company, project, kind, note, createdAt){
     if (insRes.error) throw insRes.error;
   } catch (err) {
     showToast('Não foi possível registrar esse evento no histórico de e-mails.', 'warn');
+  }
+}
+async function updatePmEmailEvent(id, note, createdAt){
+  // usado para corrigir uma resposta do PM já salva (texto e/ou data
+  // errados) sem duplicar a linha no histórico.
+  if (!supabaseClient || id == null) return false;
+  try {
+    var payload = { note: note || null };
+    if (createdAt) payload.created_at = createdAt;
+    var updRes = await supabaseClient.from('pm_email_log').update(payload).eq('id', id);
+    if (updRes.error) throw updRes.error;
+    return true;
+  } catch (err) {
+    showToast('Não foi possível atualizar esse registro.', 'error');
+    return false;
   }
 }
 async function fetchPmEmailHistory(project){
@@ -3221,6 +3415,9 @@ async function boot(){
   initWeeklyReport();
   updateExcludedButtonLabel();
   render();
+  if (isAdminUser()){
+    refreshPmEmailLogSummary().then(renderReminderAlert);
+  }
   if (!supabaseClient && isAdminUser()){
     showToast('Supabase não configurado (config.js) — as alterações valem só para esta visualização.', 'warn');
   }

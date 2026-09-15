@@ -208,6 +208,26 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
   box-shadow: var(--shadow); padding: 22px 22px 10px; margin-bottom: 22px;
 }
 .card-head{ display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom: 4px; }
+
+/* aviso "lembretes pendentes" no topo do painel admin */
+.reminder-alert-card{
+  padding: 16px 20px 18px; border-color: var(--status-warning-mark);
+  background: var(--status-warning-wash);
+}
+.reminder-alert-head{ margin-bottom: 10px; }
+.reminder-alert-title{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:15px;
+  color: var(--status-warning-text);
+}
+.reminder-alert-sub{ font-size:12.5px; color: var(--text-secondary); margin: 4px 0 0; }
+.reminder-alert-list{ display:flex; flex-direction:column; gap:8px; }
+.reminder-alert-item{
+  display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  background: var(--surface-1); border:1px solid var(--border); border-radius:8px; padding:9px 12px;
+}
+.reminder-alert-info{ display:flex; flex-direction:column; gap:2px; }
+.reminder-alert-project{ font-weight:600; font-size:13.5px; color: var(--text-primary); }
+.reminder-alert-days{ font-size:11.5px; color: var(--text-muted); }
 .card-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size: 19px; letter-spacing:-0.005em; }
 .card-note{ font-size: 12.5px; color: var(--text-muted); }
 .legend{ display:flex; gap:18px; align-items:center; margin: 6px 0 4px; flex-wrap:wrap; }
@@ -414,6 +434,14 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .history-date{ font-size:11px; color: var(--text-muted); white-space:nowrap; }
 .history-note{ margin-top:6px; font-size:12.5px; color: var(--text-secondary); white-space:pre-wrap; line-height:1.5; }
 .history-empty{ text-align:center; color: var(--text-muted); padding:20px 0; font-size:13px; }
+.history-actions{ display:flex; gap:14px; margin-top:8px; }
+.history-action-btn{
+  background:none; border:none; padding:0; cursor:pointer;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:11.5px; font-weight:600;
+  color: var(--text-muted); text-decoration:underline;
+}
+.history-action-btn:hover{ color: var(--text-primary); }
+.history-action-btn.danger:hover{ color: var(--status-critical); }
 textarea.reply-input{
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:13px; color: var(--text-primary);
   background: var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px;
@@ -594,6 +622,14 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       </div>
     </div>
   </header>
+
+  <div class="card reminder-alert-card fade-in" id="reminderAlertCard" hidden>
+    <div class="reminder-alert-head">
+      <div class="reminder-alert-title">Lembretes pendentes</div>
+      <p class="reminder-alert-sub">E-mail original enviado há 7 dias ou mais, sem lembrete nem resposta do PM registrados depois disso.</p>
+    </div>
+    <div class="reminder-alert-list" id="reminderAlertList"></div>
+  </div>
 
   <div class="filters fade-in d1">
     <div class="filter-group">
@@ -896,7 +932,9 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       <input type="date" id="emailHistoryReplyDate" />
     </div>
     <div class="modal-actions">
-      <div></div>
+      <div class="modal-actions-left">
+        <button type="button" class="btn ghost small" id="emailHistoryCancelEdit" hidden>Cancelar edição</button>
+      </div>
       <div class="modal-actions-right">
         <button type="button" class="btn ghost" id="emailHistoryCloseBtn">Fechar</button>
         <button type="button" class="btn primary" id="btnSavePmReply">Salvar resposta</button>
