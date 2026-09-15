@@ -218,11 +218,17 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
    discreto em vez de chamar atenção com a cor de aviso o tempo todo */
 .reminder-alert-card.no-action{ border-color: var(--border); background: var(--surface-1); }
 .reminder-alert-card.no-action .reminder-alert-title{ color: var(--text-primary); }
-.reminder-alert-head{ margin-bottom: 10px; }
+.reminder-alert-head{
+  margin-bottom: 10px; cursor:pointer; user-select:none; list-style:none; display:block;
+}
+.reminder-alert-head::-webkit-details-marker{ display:none; }
 .reminder-alert-title{
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:15px;
   color: var(--status-warning-text);
 }
+.reminder-alert-title::before{ content:"▾ "; }
+.reminder-alert-main:not([open]) > .reminder-alert-head .reminder-alert-title::before{ content:"▸ "; }
+.reminder-alert-main:not([open]) > .reminder-alert-head{ margin-bottom: 0; }
 .reminder-alert-sub{ font-size:12.5px; color: var(--text-secondary); margin: 4px 0 0; }
 .reminder-alert-list{ display:flex; flex-direction:column; gap:8px; }
 .reminder-alert-item{
@@ -641,11 +647,13 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   </header>
 
   <div class="card reminder-alert-card fade-in" id="reminderAlertCard" hidden>
-    <div class="reminder-alert-head">
-      <div class="reminder-alert-title">Lembretes pendentes</div>
-      <p class="reminder-alert-sub">Projetos com e-mail enviado há mais de 1 semana, ainda sem lembrete nem resposta do PM.</p>
-    </div>
-    <div class="reminder-alert-list" id="reminderAlertList"></div>
+    <details class="reminder-alert-main" id="reminderAlertMainSection" open>
+      <summary class="reminder-alert-head">
+        <div class="reminder-alert-title">Lembretes pendentes</div>
+        <p class="reminder-alert-sub">Projetos com e-mail enviado há mais de 1 semana, ainda sem lembrete nem resposta do PM.</p>
+      </summary>
+      <div class="reminder-alert-list" id="reminderAlertList"></div>
+    </details>
     <details class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
       <summary class="reminder-alert-secondary-title" id="reminderAlertGoodTitle">Sem lembrete necessário (SPI bom no envio)</summary>
       <div class="reminder-alert-list muted" id="reminderAlertGoodList"></div>
