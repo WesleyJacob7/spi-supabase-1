@@ -862,10 +862,10 @@ function renderEmailHistoryList(entries){
 
 var emailHistoryProject = null;
 var emailHistoryCompany = null;
-function nowAsDatetimeLocalValue(){
+function nowAsDateValue(){
   var d = new Date();
   var pad = function(n){ return String(n).padStart(2, '0'); };
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 function mergeSyntheticEmailSentEntry(entries, row){
   // Lançamentos cujo e-mail original foi enviado antes deste histórico
@@ -888,7 +888,7 @@ async function openEmailHistory(row){
   var replyEl = document.getElementById('emailHistoryReply');
   if (replyEl) replyEl.value = '';
   var replyDateEl = document.getElementById('emailHistoryReplyDate');
-  if (replyDateEl) replyDateEl.value = nowAsDatetimeLocalValue();
+  if (replyDateEl) replyDateEl.value = nowAsDateValue();
   var list = document.getElementById('emailHistoryList');
   if (list) list.innerHTML = '<div class="history-empty">Carregando…</div>';
   var overlay = document.getElementById('emailHistoryOverlay');
@@ -919,13 +919,14 @@ function initEmailHistoryModal(){
     var dateEl = document.getElementById('emailHistoryReplyDate');
     var createdAt = null;
     if (dateEl && dateEl.value){
-      var parsedDate = new Date(dateEl.value);
+      // meio-dia local evita o evento "pular" de dia ao converter para UTC
+      var parsedDate = new Date(dateEl.value + 'T12:00:00');
       if (!isNaN(parsedDate.getTime())) createdAt = parsedDate.toISOString();
     }
     saveBtn.disabled = true;
     await logPmEmailEvent(company, project, 'pm_reply', text, createdAt);
     if (replyEl) replyEl.value = '';
-    if (dateEl) dateEl.value = nowAsDatetimeLocalValue();
+    if (dateEl) dateEl.value = nowAsDateValue();
     var entries = await fetchPmEmailHistory(project);
     if (emailHistoryProject === project) renderEmailHistoryList(entries);
     saveBtn.disabled = false;
