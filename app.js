@@ -728,7 +728,7 @@ function initEmailConfirm(){
           window.alert('Não foi possível copiar o gráfico automaticamente (este navegador não suporta essa função).\n\nO e-mail vai abrir sem a imagem — cole ou anexe o gráfico manualmente antes de enviar, se precisar.');
         }
         openMailClient(row);
-        logPmEmailEvent(row.company, row.project, 'email_sent', null, null, statusOf(row.spi)).then(function(){
+        logPmEmailEvent(row.company, row.project, 'email_sent', null, null, statusOf(row.spi), row.spi, row.date).then(function(){
           refreshPmEmailLogSummary().then(renderReminderAlert);
         });
         closeEmailConfirm(); // o diálogo ficava aberto atrás do alerta acima; fecha para liberar a tela (inclui "Lembrar PM")
@@ -860,6 +860,24 @@ function renderEmailHistoryList(entries){
     dateEl.textContent = formatHistoryDate(ev.created_at);
     head.appendChild(dateEl);
     item.appendChild(head);
+    // no e-mail original, mostra o SPI (valor e status) e a "data de
+    // referência" do lançamento reportado naquele e-mail — congelados no
+    // momento do envio (ver logPmEmailEvent), então continuam corretos
+    // mesmo que o SPI do projeto mude depois. Só existe em envios feitos
+    // depois que essa informação passou a ser gravada.
+    if (ev.kind === 'email_sent' && (ev.spi_status || typeof ev.spi_value === 'number')){
+      var spiParts = [];
+      if (typeof ev.spi_value === 'number') spiParts.push('SPI ' + fmtSpi(ev.spi_value));
+      if (ev.spi_status && statusLabel[ev.spi_status]) spiParts.push('(' + statusLabel[ev.spi_status] + ')');
+      var spiLine = spiParts.join(' ');
+      if (ev.ref_date) spiLine += (spiLine ? ' — ' : '') + 'Data de referência ' + fmtDateMDY(ev.ref_date);
+      if (spiLine){
+        var spiInfoEl = document.createElement('div');
+        spiInfoEl.className = 'history-note history-spi-info';
+        spiInfoEl.textContent = spiLine;
+        item.appendChild(spiInfoEl);
+      }
+    }
     if (ev.note){
       var noteEl = document.createElement('div');
       noteEl.className = 'history-note';
@@ -952,24 +970,28 @@ function latestWeekRows(){
   var latest = weeks[weeks.length - 1];
   return DATA.filter(function(d){ return d.week === latest && !excludedProjects.has(d.project); });
 }
-function projectsNeedingReminder(){
+function reminderAlertLists(){
+  // Separa em duas listas os projetos com e-mail original enviado há 7+ dias
+  // e sem lembrete/resposta registrados depois: os que realmente precisam de
+  // um "Lembrar PM" (needsReminder) e os que estão de fora dessa cobrança só
+  // porque o SPI estava Bom no momento do envio (goodAtSend) — essa segunda
+  // lista existe para dar transparência de por que o botão não aparece
+  // nesses casos, em vez de simplesmente sumir com o projeto do aviso.
   var now = new Date();
   var dayMs = 24 * 60 * 60 * 1000;
   var seen = {};
-  var result = [];
+  var needsReminder = [];
+  var goodAtSend = [];
   latestWeekRows().forEach(function(row){
     if (!row.email_sent_at || seen[row.project]) return;
     seen[row.project] = true;
     var summary = pmEmailLogSummary[row.project];
-    // SPI "Bom" não gera cobrança de resposta (ver conversa sobre o fluxo de
-    // e-mails) — o que importa é o SPI de QUANDO o e-mail foi enviado, não o
-    // de hoje (um projeto pode ter saído do "Bom" depois; nesse caso o certo
-    // é reenviar o e-mail original no próximo ciclo, não cobrar lembrete
-    // deste). lastEmailSentStatus vem congelado em logPmEmailEvent; na
-    // ausência dele (log antigo sem essa informação), cai para o SPI atual
-    // como aproximação.
+    // O que importa é o SPI de QUANDO o e-mail foi enviado, não o de hoje (um
+    // projeto pode ter saído do "Bom" depois; nesse caso o certo é reenviar o
+    // e-mail original no próximo ciclo, não cobrar lembrete deste).
+    // lastEmailSentStatus vem congelado em logPmEmailEvent; na ausência dele
+    // (log antigo sem essa informação), cai para o SPI atual como aproximação.
     var frozenStatus = summary && summary.lastEmailSentStatus ? summary.lastEmailSentStatus : statusOf(row.spi);
-    if (frozenStatus === 'good') return;
     var sentDate = new Date(row.email_sent_at);
     if (isNaN(sentDate.getTime())) return;
     var daysSince = Math.floor((now - sentDate) / dayMs);
@@ -978,23 +1000,27 @@ function projectsNeedingReminder(){
     var lastReply = summary && summary.lastReply ? new Date(summary.lastReply) : null;
     if (lastReminder && lastReminder > sentDate) return; // já lembrou depois deste e-mail
     if (lastReply && lastReply > sentDate) return; // já tem resposta depois deste e-mail
-    result.push({ row: row, daysSince: daysSince });
+    if (frozenStatus === 'good'){
+      goodAtSend.push({ row: row, daysSince: daysSince });
+    } else {
+      needsReminder.push({ row: row, daysSince: daysSince });
+    }
   });
-  result.sort(function(a, b){ return b.daysSince - a.daysSince; });
-  return result;
+  needsReminder.sort(function(a, b){ return b.daysSince - a.daysSince; });
+  goodAtSend.sort(function(a, b){ return b.daysSince - a.daysSince; });
+  return { needsReminder: needsReminder, goodAtSend: goodAtSend };
 }
-function renderReminderAlert(){
-  var card = document.getElementById('reminderAlertCard');
-  var list = document.getElementById('reminderAlertList');
-  if (!card || !list) return;
-  var items = projectsNeedingReminder();
+function renderReminderAlertItems(container, items, showButton, emptyMessage){
+  container.innerHTML = '';
   if (!items.length){
-    card.hidden = true;
-    list.innerHTML = '';
+    if (emptyMessage){
+      var empty = document.createElement('div');
+      empty.className = 'history-empty';
+      empty.textContent = emptyMessage;
+      container.appendChild(empty);
+    }
     return;
   }
-  card.hidden = false;
-  list.innerHTML = '';
   items.forEach(function(entry){
     var row = entry.row;
     var line = document.createElement('div');
@@ -1007,17 +1033,42 @@ function renderReminderAlert(){
     info.appendChild(name);
     var days = document.createElement('span');
     days.className = 'reminder-alert-days';
-    days.textContent = 'e-mail enviado há ' + entry.daysSince + ' dias, sem resposta registrada';
+    days.textContent = showButton
+      ? ('e-mail enviado há ' + entry.daysSince + ' dias, sem resposta registrada')
+      : ('e-mail enviado há ' + entry.daysSince + ' dias com SPI Bom — sem cobrança de resposta');
     info.appendChild(days);
     line.appendChild(info);
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn ghost small';
-    btn.textContent = 'Lembrar PM';
-    btn.addEventListener('click', function(){ openRemindConfirm(row); });
-    line.appendChild(btn);
-    list.appendChild(line);
+    if (showButton){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn ghost small';
+      btn.textContent = 'Lembrar PM';
+      btn.addEventListener('click', function(){ openRemindConfirm(row); });
+      line.appendChild(btn);
+    }
+    container.appendChild(line);
   });
+}
+function renderReminderAlert(){
+  var card = document.getElementById('reminderAlertCard');
+  var list = document.getElementById('reminderAlertList');
+  var goodSection = document.getElementById('reminderAlertGoodSection');
+  var goodList = document.getElementById('reminderAlertGoodList');
+  if (!card || !list) return;
+  var lists = reminderAlertLists();
+  if (!lists.needsReminder.length && !lists.goodAtSend.length){
+    card.hidden = true;
+    list.innerHTML = '';
+    if (goodList) goodList.innerHTML = '';
+    if (goodSection) goodSection.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  renderReminderAlertItems(list, lists.needsReminder, true, 'Nenhum lembrete pendente no momento.');
+  if (goodSection && goodList){
+    goodSection.hidden = !lists.goodAtSend.length;
+    renderReminderAlertItems(goodList, lists.goodAtSend, false, null);
+  }
 }
 async function refreshEmailHistory(){
   if (!emailHistoryProject) return;
@@ -1441,7 +1492,7 @@ async function loadData(){
    nome do projeto (mesma convenção já usada por pmNameForProject/
    pmEmailForProject), então o histórico sobrevive a avançar semana, editar
    ou até excluir um lançamento específico. */
-async function logPmEmailEvent(company, project, kind, note, createdAt, spiStatus){
+async function logPmEmailEvent(company, project, kind, note, createdAt, spiStatus, spiValue, refDate){
   if (!supabaseClient) return;
   try {
     var payload = { company: company, project: project, kind: kind, note: note || null };
@@ -1449,12 +1500,16 @@ async function logPmEmailEvent(company, project, kind, note, createdAt, spiStatu
     // do PM que chegou há alguns dias e só está sendo colada agora) — sem
     // passar isso, o banco usa a data/hora atual (now()) como sempre foi.
     if (createdAt) payload.created_at = createdAt;
-    // spiStatus (só usado em kind === 'email_sent') congela o status do SPI
-    // no momento do envio — projeto com SPI Bom nunca gera cobrança de
-    // resposta, mesmo que degrade depois; sem isso o aviso de "lembretes
-    // pendentes" ficaria julgando pelo SPI de HOJE, não pelo de quando o
-    // e-mail foi mandado (ver projectsNeedingReminder).
+    // spiStatus/spiValue/refDate (só usados em kind === 'email_sent') congelam
+    // como estava o SPI no momento do envio: status (projeto com SPI Bom não
+    // gera cobrança de resposta, mesmo que degrade depois — ver
+    // projectsNeedingReminder), o valor do SPI e a "data de referência" do
+    // lançamento reportado naquele e-mail (que é diferente da data em que o
+    // e-mail foi de fato enviado) — assim dá pra conferir isso depois no
+    // histórico sem precisar confiar de memória.
     if (spiStatus) payload.spi_status = spiStatus;
+    if (typeof spiValue === 'number' && !isNaN(spiValue)) payload.spi_value = spiValue;
+    if (refDate) payload.ref_date = refDate;
     var insRes = await supabaseClient.from('pm_email_log').insert(payload);
     if (insRes.error) throw insRes.error;
   } catch (err) {
