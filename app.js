@@ -2735,6 +2735,60 @@ function rowsForWeek(weekLabel){
     return d.week === weekLabel && state.companies.has(d.company) && state.scopes.has(d.scope) && !excludedProjects.has(d.project);
   });
 }
+
+/* ---------- histórico do SPI global (sparkline do card "SPI Global") ---------- */
+// Reaproveita os mesmos filtros de empresa/escopo/exclusão da seleção atual (rowsForWeek),
+// olhando para trás a partir da semana selecionada — assim a linha reflete o que o KPI
+// ao lado está mostrando, inclusive quando o usuário filtra por empresa.
+function globalSpiHistory(maxPoints){
+  var idx = weeks.indexOf(state.week);
+  if (idx < 0) return [];
+  var start = Math.max(0, idx - (maxPoints - 1));
+  var out = [];
+  weeks.slice(start, idx + 1).forEach(function(w){
+    var spi = weightedSpi(rowsForWeek(w));
+    if (spi !== null) out.push({ week: w, spi: spi });
+  });
+  return out;
+}
+function renderKpiSpark(){
+  var wrap = document.getElementById('kpiSpark');
+  var svg = document.getElementById('kpiSparkSvg');
+  if (!wrap || !svg) return;
+  var hist = globalSpiHistory(12);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  if (hist.length < 2){ wrap.hidden = true; return; }
+  wrap.hidden = false;
+  wrap.title = 'SPI global · ' + hist[0].week + ' – ' + hist[hist.length - 1].week;
+
+  var vals = hist.map(function(h){ return h.spi; });
+  var n = vals.length;
+  var W = 100, H = 40, M = 4;
+  var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  var pad = (hi - lo) * 0.2 || 0.01;
+  lo -= pad; hi += pad;
+  function x(i){ return M + (i / (n - 1)) * (W - 2 * M); }
+  function y(v){ return H - M - ((v - lo) / (hi - lo)) * (H - 2 * M); }
+
+  var svgns = 'http://www.w3.org/2000/svg';
+  if (n > 2){
+    var mutedPts = vals.slice(0, -1).map(function(v, i){ return x(i) + ',' + y(v); }).join(' L ');
+    var mutedPath = document.createElementNS(svgns, 'path');
+    mutedPath.setAttribute('d', 'M ' + mutedPts);
+    mutedPath.setAttribute('class', 'spark-muted');
+    svg.appendChild(mutedPath);
+  }
+  var accentPath = document.createElementNS(svgns, 'path');
+  accentPath.setAttribute('d', 'M ' + x(n - 2) + ',' + y(vals[n - 2]) + ' L ' + x(n - 1) + ',' + y(vals[n - 1]));
+  accentPath.setAttribute('class', 'spark-accent');
+  svg.appendChild(accentPath);
+  var dot = document.createElementNS(svgns, 'circle');
+  dot.setAttribute('cx', x(n - 1)); dot.setAttribute('cy', y(vals[n - 1]));
+  dot.setAttribute('r', '3.2');
+  dot.setAttribute('class', 'spark-dot');
+  svg.appendChild(dot);
+}
+
 var SPI_EPSILON = 0.0005;
 function computeWeeklyComparison(currentWeek, previousWeek){
   var curRows = rowsForWeek(currentWeek);
@@ -3245,6 +3299,7 @@ function render(){
 
   document.getElementById('kpiAvgSpi').textContent = sumSched > 0 ? fmtSpi(spiGlobal) : '—';
   document.getElementById('kpiAvgSpiSub').textContent = 'ponderado por duração · ' + rows.length + ' projeto(s)';
+  renderKpiSpark();
   document.getElementById('kpiGood').textContent = good;
   document.getElementById('kpiGoodSub').textContent = withSpi.length ? Math.round(good / withSpi.length * 100) + '% da seleção' : ' ';
   document.getElementById('kpiWarn').textContent = warn;

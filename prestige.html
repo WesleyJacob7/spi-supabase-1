@@ -202,6 +202,15 @@ select.wk:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px
 .kpi .value.crit{ color: var(--status-critical); }
 .kpi .sub{ font-size: 12.5px; color: var(--text-secondary); margin-top:6px; }
 
+.kpi--with-spark{ display:flex; align-items:center; gap:14px; }
+.kpi--with-spark .kpi-main{ flex:1 1 auto; min-width:0; }
+.kpi-spark{ flex:none; width:96px; height:36px; }
+.kpi-spark svg{ display:block; width:100%; height:100%; overflow:visible; }
+.kpi-spark .spark-muted{ fill:none; stroke: var(--text-secondary); stroke-width:1.75; stroke-linejoin:round; stroke-linecap:round; opacity:.55; }
+.kpi-spark .spark-accent{ fill:none; stroke: var(--accent); stroke-width:2; stroke-linecap:round; }
+.kpi-spark .spark-dot{ fill: var(--accent); }
+@media (max-width: 560px){ .kpi-spark{ display:none !important; } }
+
 /* chart card */
 .card{
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
@@ -622,10 +631,15 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   </div>
 
   <div class="kpis fade-in d1">
-    <div class="kpi">
-      <div class="label">SPI Global</div>
-      <div class="value" id="kpiAvgSpi">&mdash;</div>
-      <div class="sub" id="kpiAvgSpiSub">na seleção atual</div>
+    <div class="kpi kpi--with-spark">
+      <div class="kpi-main">
+        <div class="label">SPI Global</div>
+        <div class="value" id="kpiAvgSpi">&mdash;</div>
+        <div class="sub" id="kpiAvgSpiSub">na seleção atual</div>
+      </div>
+      <div class="kpi-spark" id="kpiSpark" hidden title="Tendência do SPI global nas últimas semanas">
+        <svg id="kpiSparkSvg" viewBox="0 0 100 40" preserveAspectRatio="none"></svg>
+      </div>
     </div>
     <div class="kpi">
       <div class="label">Bom (SPI &gt; 1,00)</div>
