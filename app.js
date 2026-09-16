@@ -1574,11 +1574,14 @@ function updatePublishWeekUI(){
   var label = document.getElementById('publishedWeekLabel');
   if (label) label.textContent = publishedWeek ? publishedWeek : 'nenhuma ainda';
   var btn = document.getElementById('btnPublishWeek');
-  if (btn) btn.disabled = !state.week || state.week === publishedWeek;
+  // Desabilitado também para qualquer semana ANTERIOR à já publicada (não só
+  // a igual) — uma semana mais antiga selecionada só pra consulta já está
+  // coberta pela publicação atual, então não faz sentido oferecer o botão.
+  if (btn) btn.disabled = !state.week || (!!publishedWeek && state.week <= publishedWeek);
 }
 function btnPublishWeekClick(){
   if (!state.week) return;
-  if (state.week === publishedWeek){
+  if (publishedWeek && state.week <= publishedWeek){
     showToast('A semana ' + state.week + ' já está publicada para JKA/Prestige.', '');
     return;
   }
