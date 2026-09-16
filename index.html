@@ -666,6 +666,8 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       <select id="weekSelect" class="wk"></select>
       <button type="button" class="btn ghost small" id="btnAdvanceWeek" title="Copia os projetos da semana atual para a próxima semana">Avançar semana →</button>
       <button type="button" class="btn small danger-outline" id="btnDeleteWeek" title="Remove todos os lançamentos da semana selecionada (use se ela foi incluída por engano)">Excluir semana</button>
+      <button type="button" class="btn small primary" id="btnPublishWeek" title="Libera a semana selecionada para os sites da JKA e da Prestige">Publicar semana</button>
+      <span class="filter-label" id="publishWeekStatus">Publicado até: <b id="publishedWeekLabel">—</b></span>
     </div>
     <div class="filter-group" id="companyFilterGroup">
       <span class="filter-label">Empresa</span>
@@ -906,6 +908,17 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     <div class="confirm-actions">
       <button type="button" class="btn ghost" id="deleteWeekConfirmNo">Cancelar</button>
       <button type="button" class="btn danger" id="deleteWeekConfirmYes">Sim, excluir semana</button>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="publishWeekConfirmOverlay" hidden>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="publishWeekConfirmTitle">
+    <div class="confirm-title" id="publishWeekConfirmTitle">Publicar semana para JKA/Prestige?</div>
+    <p class="confirm-text" id="publishWeekConfirmText"></p>
+    <div class="confirm-actions">
+      <button type="button" class="btn ghost" id="publishWeekConfirmNo">Cancelar</button>
+      <button type="button" class="btn primary" id="publishWeekConfirmYes">Sim, publicar</button>
     </div>
   </div>
 </div>

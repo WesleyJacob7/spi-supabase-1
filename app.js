@@ -1,4 +1,3 @@
-
 "use strict";
 
 /* ---------- configuração do e-mail de acompanhamento de SPI ----------
@@ -39,6 +38,11 @@ var AUTH_USERS = [
 ];
 var AUTH_SESSION_KEY = 'spi-auth-user';
 var authOverrides = {}; // { nome: novaSenha } — senhas trocadas pela tela "Alterar senha", sobrepõem AUTH_USERS
+// Até qual semana (formato "AAAA-SS", igual a d.week) os dados ficam visíveis
+// para os sites somente leitura (JKA/Prestige) — ver publishWeek() e o filtro
+// em boot(). null = sem corte (mostra tudo), estado só possível antes da
+// primeira publicação feita pelo botão "Publicar semana".
+var publishedWeek = null;
 var SPI_FORCED_VIEW = (typeof window.SPI_FORCED_VIEW !== 'undefined' && window.SPI_FORCED_VIEW) || null; // "JKA"/"Prestige" nos sites dedicados de cada empresa (definido antes de app.js); null no site do Wesley Jacob
 var currentUser = null;
 var currentUserRole = 'admin';
@@ -49,12 +53,17 @@ function isAdminUser(){ return currentUserRole === 'admin'; }
 // publicado que os lançamentos — ver persistState()/buildPublishHtml() mais
 // abaixo, perto de persistData().
 async function loadAuthOverrides(){
-  if (!supabaseClient){ authOverrides = {}; return; }
+  if (!supabaseClient){ authOverrides = {}; publishedWeek = null; return; }
   try {
-    var res = await supabaseClient.from('app_state').select('auth_overrides').eq('id', 'global').maybeSingle();
+    // published_week vem junto nessa mesma consulta (mesma linha única de
+    // app_state) para não precisar de mais uma ida ao banco — é usado logo
+    // depois, em boot(), para cortar os dados dos sites somente leitura.
+    var res = await supabaseClient.from('app_state').select('auth_overrides, published_week').eq('id', 'global').maybeSingle();
     authOverrides = (res.data && res.data.auth_overrides && typeof res.data.auth_overrides === 'object') ? res.data.auth_overrides : {};
+    publishedWeek = (res.data && res.data.published_week) || null;
   } catch (e) {
     authOverrides = {};
+    publishedWeek = null;
   }
 }
 async function persistAuthOverrides(){
@@ -92,7 +101,7 @@ function populateLoginUsers(){
 }
 function applyRolePermissions(){
   var admin = isAdminUser();
-  var toHideForViewer = ['adminToolbarTop', 'headerAuthRow', 'btnAdvanceWeek', 'btnDeleteWeek', 'tableHeadActions', 'thActions'];
+  var toHideForViewer = ['adminToolbarTop', 'headerAuthRow', 'btnAdvanceWeek', 'btnDeleteWeek', 'btnPublishWeek', 'publishWeekStatus', 'tableHeadActions', 'thActions'];
   toHideForViewer.forEach(function(id){
     var elm = document.getElementById(id);
     if (elm) elm.hidden = !admin;
@@ -1424,6 +1433,64 @@ function initDeleteWeekConfirm(){
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeDeleteWeekConfirm(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeDeleteWeekConfirm(); });
 }
+
+/* ---------- publicar semana (corte de visibilidade para JKA/Prestige) ----------
+   Enquanto a semana selecionada ainda não foi publicada, ela só aparece no
+   painel do admin — os sites somente leitura continuam presos à última
+   semana publicada (ver publishedWeek e o filtro em boot()). Este botão só
+   existe/é visível no painel do admin (index.html). */
+function updatePublishWeekUI(){
+  var label = document.getElementById('publishedWeekLabel');
+  if (label) label.textContent = publishedWeek ? publishedWeek : 'nenhuma ainda';
+  var btn = document.getElementById('btnPublishWeek');
+  if (btn) btn.disabled = !state.week || state.week === publishedWeek;
+}
+function btnPublishWeekClick(){
+  if (!state.week) return;
+  if (state.week === publishedWeek){
+    showToast('A semana ' + state.week + ' já está publicada para JKA/Prestige.', '');
+    return;
+  }
+  var rows = DATA.filter(function(d){ return d.week === state.week; });
+  openPublishWeekConfirm(state.week, rows.length);
+}
+async function performPublishWeek(weekLabel){
+  var btn = document.getElementById('btnPublishWeek');
+  if (btn) btn.disabled = true;
+  var ok = await publishWeek(weekLabel);
+  if (btn) btn.disabled = false;
+  if (!ok) return;
+  updatePublishWeekUI();
+  showToast('Semana ' + weekLabel + ' publicada — já visível para JKA/Prestige.', '');
+}
+function openPublishWeekConfirm(weekLabel, count){
+  var textEl = document.getElementById('publishWeekConfirmText');
+  if (textEl){
+    textEl.textContent = 'Isso libera a semana ' + weekLabel + ' (' + count + ' lançamento(s)) para os sites da JKA e da Prestige — até agora eles só veem até a semana ' +
+      (publishedWeek || 'nenhuma') + '. Use isso só quando terminar de lançar/conferir todos os projetos dessa semana. Deseja publicar a semana ' + weekLabel + '?';
+  }
+  var overlay = document.getElementById('publishWeekConfirmOverlay');
+  if (overlay) overlay.hidden = false;
+}
+function closePublishWeekConfirm(){
+  var overlay = document.getElementById('publishWeekConfirmOverlay');
+  if (overlay) overlay.hidden = true;
+}
+function initPublishWeekConfirm(){
+  var overlay = document.getElementById('publishWeekConfirmOverlay');
+  if (!overlay) return;
+  var noBtn = document.getElementById('publishWeekConfirmNo');
+  var yesBtn = document.getElementById('publishWeekConfirmYes');
+  if (noBtn) noBtn.addEventListener('click', closePublishWeekConfirm);
+  if (yesBtn) yesBtn.addEventListener('click', function(){
+    var w = state.week;
+    closePublishWeekConfirm();
+    if (w) performPublishWeek(w);
+  });
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) closePublishWeekConfirm(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closePublishWeekConfirm(); });
+}
+
 /* ---------- persistence (Supabase) ----------
    O banco de dados no Supabase é o registro dos dados: os lançamentos ficam
    na tabela spi_records, e os projetos excluídos + a senha alterada ficam
@@ -1518,6 +1585,30 @@ async function persistState(){
     return true;
   } catch (err) {
     showToast('Não foi possível salvar no Supabase agora. Tente novamente em instantes.', 'error');
+    return false;
+  }
+}
+
+// Grava o corte de publicação (até qual semana os sites JKA/Prestige podem
+// ver) — separado de persistState() porque isso é uma decisão do admin, não
+// algo derivado do DATA em memória, e não deve rodar (nem falhar) sempre que
+// qualquer lançamento é salvo.
+async function publishWeek(weekLabel){
+  if (!supabaseClient){
+    publishedWeek = weekLabel;
+    showToast('Supabase não configurado (config.js) — "semana publicada" vale só nesta visualização.', 'warn');
+    return true;
+  }
+  try {
+    var res = await supabaseClient.from('app_state').update({
+      published_week: weekLabel,
+      updated_at: new Date().toISOString()
+    }).eq('id', 'global');
+    if (res.error) throw res.error;
+    publishedWeek = weekLabel;
+    return true;
+  } catch (err) {
+    showToast('Não foi possível publicar a semana agora. Tente novamente em instantes.', 'error');
     return false;
   }
 }
@@ -2973,6 +3064,7 @@ function render(){
   var idWeek = document.getElementById('id-week');
   if (idCount) idCount.textContent = rows.length;
   if (idWeek) idWeek.textContent = state.week || '—';
+  updatePublishWeekUI();
 
   var btnEmailHead = document.getElementById('btnEmailHead');
   var isolatedRow = state.isolatedProject ? rows.find(function(d){ return d.project === state.isolatedProject; }) : null;
@@ -3321,6 +3413,8 @@ function initFormListeners(){
   if (btnAdvanceWeek) btnAdvanceWeek.addEventListener('click', advanceWeek);
   var btnDeleteWeek = document.getElementById('btnDeleteWeek');
   if (btnDeleteWeek) btnDeleteWeek.addEventListener('click', btnDeleteWeekClick);
+  var btnPublishWeek = document.getElementById('btnPublishWeek');
+  if (btnPublishWeek) btnPublishWeek.addEventListener('click', btnPublishWeekClick);
   var btnExportData = document.getElementById('btnExportData');
   if (btnExportData) btnExportData.addEventListener('click', exportData);
   var btnImportData = document.getElementById('btnImportData');
@@ -3524,11 +3618,20 @@ async function boot(){
   initExcludeConfirm();
   initAdvanceConfirm();
   initDeleteWeekConfirm();
+  initPublishWeekConfirm();
   initTrendMode();
 
   await loadData();
   if (currentUserCompanyScope){
     DATA = DATA.filter(function(d){ return d.company === currentUserCompanyScope; });
+  }
+  // Corte de publicação: enquanto o Wesley Jacob está lançando/ajustando uma
+  // semana nova, os sites somente leitura (JKA/Prestige) continuam mostrando
+  // só até a última semana publicada — em vez de já exibir lançamentos ainda
+  // em edição. Comparação de string funciona porque week é sempre "AAAA-SS"
+  // com 2 dígitos na semana. Não afeta o painel do admin (vê tudo sempre).
+  if (!isAdminUser() && publishedWeek){
+    DATA = DATA.filter(function(d){ return d.week <= publishedWeek; });
   }
   await loadExcluded();
   recomputeDerivedLists();
