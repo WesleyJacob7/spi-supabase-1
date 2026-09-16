@@ -1007,6 +1007,15 @@ function historicalRowAtOrBefore(project, atDate){
   if (!chosen) chosen = rows[0]; // e-mail enviado antes de qualquer lançamento salvo — usa o mais antigo como aproximação
   return chosen;
 }
+// Acha a semana (formato "AAAA-SS") do lançamento de um projeto numa data
+// específica — usado para mostrar "semana do último envio" em vez da data,
+// já que pm_email_log guarda só a data (ref_date), não a semana.
+function weekForProjectDate(project, dateIso){
+  var exact = DATA.find(function(d){ return d.project === project && d.date === dateIso; });
+  if (exact) return exact.week;
+  var hist = historicalRowAtOrBefore(project, dateIso);
+  return hist ? hist.week : null;
+}
 function latestWeekRows(){
   if (!weeks.length) return [];
   var latest = weeks[weeks.length - 1];
@@ -1110,7 +1119,10 @@ function reminderAlertLists(){
         frozenSpiValue = histRow ? histRow.spi : row.spi;
         frozenRefDate = histRow ? histRow.date : row.date;
       }
-      goodAtSend.push({ row: row, daysSince: daysSince, spiValue: frozenSpiValue, refDate: frozenRefDate });
+      // pm_email_log guarda a data (ref_date), não a semana — acha a semana
+      // correspondente procurando o lançamento com essa mesma data.
+      var frozenWeek = weekForProjectDate(row.project, frozenRefDate);
+      goodAtSend.push({ row: row, daysSince: daysSince, spiValue: frozenSpiValue, refDate: frozenRefDate, week: frozenWeek });
     } else {
       needsReminder.push({ row: row, daysSince: daysSince });
     }
@@ -1148,7 +1160,7 @@ function renderReminderAlertItems(container, items, showButton, emptyMessage){
     days.className = 'reminder-alert-days';
     days.textContent = showButton
       ? ('e-mail enviado há ' + entry.daysSince + ' dias, sem resposta registrada')
-      : ('Data de referência do último envio: ' + (entry.refDate ? fmtDateMDY(entry.refDate) : '—'));
+      : ('Semana de referência do último envio: ' + (entry.week || '—'));
     info.appendChild(days);
     line.appendChild(info);
     if (showButton){
