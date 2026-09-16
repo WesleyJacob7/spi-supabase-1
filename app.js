@@ -953,7 +953,7 @@ async function refreshPmEmailLogSummary(){
     if (res.error) throw res.error;
     var summary = {};
     (res.data || []).forEach(function(ev){
-      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null, lastEmailSent: null, lastEmailSentStatus: null, lastEmailSentSpiValue: null, lastEmailSentRefDate: null });
+      var s = summary[ev.project] || (summary[ev.project] = { lastReminder: null, lastReply: null, lastEmailSent: null, firstEmailSent: null, lastEmailSentStatus: null, lastEmailSentSpiValue: null, lastEmailSentRefDate: null });
       if (ev.kind === 'reminder_sent'){
         if (!s.lastReminder || new Date(ev.created_at) > new Date(s.lastReminder)) s.lastReminder = ev.created_at;
       } else if (ev.kind === 'pm_reply'){
@@ -967,6 +967,11 @@ async function refreshPmEmailLogSummary(){
           s.lastEmailSentStatus = ev.spi_status || null;
           s.lastEmailSentSpiValue = (typeof ev.spi_value === 'number') ? ev.spi_value : null;
           s.lastEmailSentRefDate = ev.ref_date || null;
+        }
+        // primeiro e-mail original já enviado a este projeto — define o
+        // "dia-âncora" do ciclo mensal (ver projectEmailDueInfo).
+        if (!s.firstEmailSent || new Date(ev.created_at) < new Date(s.firstEmailSent)){
+          s.firstEmailSent = ev.created_at;
         }
       }
     });
@@ -1007,6 +1012,49 @@ function latestWeekRows(){
   var latest = weeks[weeks.length - 1];
   return DATA.filter(function(d){ return d.week === latest && !excludedProjects.has(d.project); });
 }
+
+/* ---------- ciclo mensal do e-mail original ("primeiro e-mail") ----------
+   Cada projeto tem seu "dia-âncora" fixado pelo dia do mês do 1º e-mail
+   original já enviado a ele (guardado em pmEmailLogSummary[project].
+   firstEmailSent) — ex.: 1º envio dia 5, vence sempre dia 5 dos meses
+   seguintes, mesmo que os envios reais aconteçam um pouco antes/depois.
+   Usado para (a) liberar "Lembrar PM" nas semanas seguintes sem precisar
+   reenviar o e-mail original toda semana, e (b) o card "E-mail original
+   pendente". */
+function isoDateOnly(d){
+  var pad = function(n){ return String(n).padStart(2, '0'); };
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+function daysInMonth(year, monthIndex0){ return new Date(year, monthIndex0 + 1, 0).getDate(); }
+// Data (dentro do mês de refDate, ou do mês anterior, se o dia-âncora ainda
+// não chegou neste mês) mais recente com dia == anchorDay que seja <=
+// refDate — ajustada pro último dia do mês quando ele for mais curto que o
+// dia-âncora (ex.: âncora dia 31 num mês de 30 dias vira dia 30).
+function monthlyAnchorOnOrBefore(anchorDay, refDate){
+  var y = refDate.getFullYear(), m = refDate.getMonth();
+  var day = Math.min(anchorDay, daysInMonth(y, m));
+  var candidate = new Date(y, m, day);
+  if (candidate > refDate){
+    m -= 1;
+    if (m < 0){ m = 11; y -= 1; }
+    day = Math.min(anchorDay, daysInMonth(y, m));
+    candidate = new Date(y, m, day);
+  }
+  return candidate;
+}
+// Situação do e-mail original de um projeto: 'never' (nunca enviado),
+// 'overdue' (já passou do dia-âncora deste ciclo sem um envio depois dele)
+// ou 'ok' (enviado dentro do ciclo atual — "Lembrar PM" pode ser usado).
+function projectEmailDueInfo(project){
+  var s = pmEmailLogSummary[project];
+  if (!s || !s.firstEmailSent) return { status: 'never' };
+  var anchorDay = new Date(s.firstEmailSent).getDate();
+  var cycleAnchor = monthlyAnchorOnOrBefore(anchorDay, new Date());
+  var lastSent = s.lastEmailSent ? new Date(s.lastEmailSent) : null;
+  if (!lastSent || lastSent < cycleAnchor) return { status: 'overdue', dueDate: cycleAnchor };
+  return { status: 'ok' };
+}
+
 function reminderAlertLists(){
   // Separa em duas listas os projetos com e-mail original enviado há 7+ dias
   // e sem lembrete/resposta registrados depois: os que realmente precisam de
@@ -1020,16 +1068,28 @@ function reminderAlertLists(){
   var needsReminder = [];
   var goodAtSend = [];
   latestWeekRows().forEach(function(row){
-    if (!row.email_sent_at || seen[row.project]) return;
-    seen[row.project] = true;
+    if (seen[row.project]) return;
     var summary = pmEmailLogSummary[row.project];
+    // Usa o último envio registrado no histórico por projeto (pm_email_log),
+    // não o campo da semana atual — esse campo é por lançamento e não
+    // "acompanha" o projeto quando a semana avança (ver e-mail mensal
+    // abaixo), então sozinho fazia este aviso esquecer projetos com e-mail
+    // enviado há mais de uma virada de semana. Cai pro campo antigo só se
+    // não houver log nenhum (não deve acontecer daqui pra frente).
+    var lastSentIso = (summary && summary.lastEmailSent) || row.email_sent_at;
+    if (!lastSentIso) return;
+    seen[row.project] = true;
+    // Se o e-mail original já venceu o ciclo mensal, o card certo pra isso é
+    // "E-mail original pendente" (reenviar o original) — não faz sentido
+    // também cobrar "Lembrar PM" de um e-mail que já passou da validade.
+    if (projectEmailDueInfo(row.project).status !== 'ok') return;
     // O que importa é o SPI de QUANDO o e-mail foi enviado, não o de hoje (um
     // projeto pode ter saído do "Bom" depois; nesse caso o certo é reenviar o
     // e-mail original no próximo ciclo, não cobrar lembrete deste).
     // lastEmailSentStatus vem congelado em logPmEmailEvent; na ausência dele
     // (log antigo sem essa informação), cai para o SPI atual como aproximação.
     var frozenStatus = summary && summary.lastEmailSentStatus ? summary.lastEmailSentStatus : statusOf(row.spi);
-    var sentDate = new Date(row.email_sent_at);
+    var sentDate = new Date(lastSentIso);
     if (isNaN(sentDate.getTime())) return;
     var daysSince = Math.floor((now - sentDate) / dayMs);
     if (daysSince < 7) return;
@@ -1103,6 +1163,7 @@ function renderReminderAlertItems(container, items, showButton, emptyMessage){
   });
 }
 function renderReminderAlert(){
+  renderEmailDueAlert(); // card independente ("E-mail original pendente"), mas atualizado junto por depender do mesmo pmEmailLogSummary
   var card = document.getElementById('reminderAlertCard');
   var list = document.getElementById('reminderAlertList');
   var goodSection = document.getElementById('reminderAlertGoodSection');
@@ -1132,6 +1193,64 @@ function renderReminderAlert(){
     renderReminderAlertItems(goodList, lists.goodAtSend, false, null);
   }
 }
+
+/* ---------- aviso "e-mail original pendente" (painel do Wesley) ----------
+   Lista, entre os projetos da semana mais recente, quem nunca recebeu o
+   e-mail de acompanhamento de SPI (projeto novo ou esquecido) ou já passou
+   do dia-âncora do ciclo mensal (ver projectEmailDueInfo) sem um reenvio
+   depois dele. Ação aqui é sempre reenviar o e-mail ORIGINAL — diferente do
+   card "Lembretes pendentes", que é sobre responder um e-mail já enviado
+   dentro do ciclo atual. Só existe na visão admin (index.html). */
+function emailDueAlertList(){
+  var seen = {};
+  var items = [];
+  latestWeekRows().forEach(function(row){
+    if (seen[row.project]) return;
+    seen[row.project] = true;
+    var info = projectEmailDueInfo(row.project);
+    if (info.status === 'never') items.push({ row: row, reason: 'never' });
+    else if (info.status === 'overdue') items.push({ row: row, reason: 'overdue', dueDate: info.dueDate });
+  });
+  items.sort(function(a, b){
+    if (a.reason !== b.reason) return a.reason === 'never' ? -1 : 1;
+    return projectLabel(a.row).localeCompare(projectLabel(b.row));
+  });
+  return items;
+}
+function renderEmailDueAlert(){
+  var card = document.getElementById('emailDueAlertCard');
+  var list = document.getElementById('emailDueAlertList');
+  if (!card || !list) return;
+  var items = emailDueAlertList();
+  card.hidden = !items.length;
+  list.innerHTML = '';
+  items.forEach(function(entry){
+    var row = entry.row;
+    var line = document.createElement('div');
+    line.className = 'reminder-alert-item';
+    var info = document.createElement('div');
+    info.className = 'reminder-alert-info';
+    var name = document.createElement('span');
+    name.className = 'reminder-alert-project';
+    name.textContent = projectLabel(row);
+    info.appendChild(name);
+    var sub = document.createElement('span');
+    sub.className = 'reminder-alert-days';
+    sub.textContent = entry.reason === 'never'
+      ? 'Nunca recebeu o e-mail de acompanhamento de SPI'
+      : ('E-mail mensal venceu em ' + fmtDateMDY(isoDateOnly(entry.dueDate)));
+    info.appendChild(sub);
+    line.appendChild(info);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn ghost small';
+    btn.textContent = 'Enviar e-mail ao PM';
+    btn.addEventListener('click', function(){ openEmailConfirm(row); });
+    line.appendChild(btn);
+    list.appendChild(line);
+  });
+}
+
 async function refreshEmailHistory(){
   if (!emailHistoryProject) return;
   var project = emailHistoryProject;
@@ -3074,12 +3193,19 @@ function render(){
   }
   var btnRemindHead = document.getElementById('btnRemindHead');
   if (btnRemindHead){
+    // Habilitado com base no histórico do PROJETO (pm_email_log), não no
+    // lançamento da semana atual — assim continua liberado nas semanas
+    // seguintes ao envio original, dentro do ciclo mensal (ver
+    // projectEmailDueInfo), em vez de exigir reenviar toda semana.
+    var dueInfo = isolatedRow ? projectEmailDueInfo(isolatedRow.project) : null;
     if (!isolatedRow){
       btnRemindHead.disabled = true;
       btnRemindHead.title = 'Clique no nome de um projeto na tabela para selecioná-lo';
-    } else if (!isolatedRow.email_sent_at){
+    } else if (!dueInfo || dueInfo.status !== 'ok'){
       btnRemindHead.disabled = true;
-      btnRemindHead.title = 'Envie primeiro o e-mail de acompanhamento de SPI ("Enviar e-mail ao PM") para este lançamento';
+      btnRemindHead.title = (dueInfo && dueInfo.status === 'overdue')
+        ? ('O e-mail mensal deste projeto venceu em ' + fmtDateMDY(isoDateOnly(dueInfo.dueDate)) + ' — envie "Enviar e-mail ao PM" de novo antes de lembrar.')
+        : 'Envie primeiro o e-mail de acompanhamento de SPI ("Enviar e-mail ao PM") para este projeto.';
     } else {
       btnRemindHead.disabled = false;
       btnRemindHead.title = 'Enviar lembrete de retorno de SPI para ' + projectLabel(isolatedRow);
