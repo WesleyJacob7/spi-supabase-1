@@ -266,6 +266,16 @@ var companies = [];
 var scopes = [];
 var weeks = [];
 var excludedProjects = new Set();
+// Projetos encerrados: { "Nome do projeto": "AAAA-SS" } — o projeto some do
+// painel a partir dessa semana (inclusive), mas continua em todas as semanas
+// anteriores (histórico, gráfico e SPI global dessas semanas não mudam).
+// Diferente de excludedProjects, que remove o projeto de TODAS as semanas.
+var endedProjects = {};
+function isHiddenRow(d){
+  if (excludedProjects.has(d.project)) return true;
+  var endWeek = endedProjects[d.project];
+  return !!(endWeek && d.week >= endWeek);
+}
 
 var STATUS_COLOR = { good: 'var(--status-good)', warn: 'var(--status-warning-mark)', crit: 'var(--status-critical)' };
 
@@ -1019,7 +1029,7 @@ function weekForProjectDate(project, dateIso){
 function latestWeekRows(){
   if (!weeks.length) return [];
   var latest = weeks[weeks.length - 1];
-  return DATA.filter(function(d){ return d.week === latest && !excludedProjects.has(d.project); });
+  return DATA.filter(function(d){ return d.week === latest && !isHiddenRow(d); });
 }
 
 /* ---------- ciclo mensal do e-mail original ("primeiro e-mail") ----------
@@ -1712,6 +1722,7 @@ async function persistState(){
     }
     var stateRes = await supabaseClient.from('app_state').update({
       excluded_projects: Array.from(excludedProjects),
+      ended_projects: endedProjects,
       auth_overrides: authOverrides,
       updated_at: new Date().toISOString()
     }).eq('id', 'global');
@@ -1836,7 +1847,7 @@ async function persistData(newData){
 // arquivo .html baixado e aberto direto no navegador) window.claude nem
 // existe, e o download tradicional funciona normalmente.
 async function exportData(){
-  var payload = { data: DATA, excludedProjects: Array.from(excludedProjects) };
+  var payload = { data: DATA, excludedProjects: Array.from(excludedProjects), endedProjects: endedProjects };
   var jsonStr = JSON.stringify(payload, null, 2);
   var filename = 'spi-lancamentos.json';
 
@@ -1880,6 +1891,7 @@ function importDataFromFile(file){
       } else if (parsed && Array.isArray(parsed.data)){
         newData = parsed.data;
         if (Array.isArray(parsed.excludedProjects)) newExcluded = parsed.excludedProjects;
+        if (parsed.endedProjects && typeof parsed.endedProjects === 'object' && !Array.isArray(parsed.endedProjects)) endedProjects = parsed.endedProjects;
       } else {
         throw new Error('formato inválido');
       }
@@ -2190,7 +2202,7 @@ function filteredTrendGroups(){
   // é só um valor de espera, sem significado, e um projeto sem nenhuma
   // semana assim simplesmente não aparece (não há o que comparar).
   var rows = DATA.filter(function(d){
-    return state.companies.has(d.company) && state.scopes.has(d.scope) && !excludedProjects.has(d.project) && d.pct_complete > 0;
+    return state.companies.has(d.company) && state.scopes.has(d.scope) && !isHiddenRow(d) && d.pct_complete > 0;
   });
   var byProject = {};
   rows.forEach(function(d){
@@ -2597,19 +2609,22 @@ function populateDatalists(){
 
 function currentRows(){
   return DATA.filter(function(d){
-    return d.week === state.week && state.companies.has(d.company) && state.scopes.has(d.scope) && !excludedProjects.has(d.project);
+    return d.week === state.week && state.companies.has(d.company) && state.scopes.has(d.scope) && !isHiddenRow(d);
   });
 }
 
 /* ---------- exclusão de projetos (reversível, vale para todas as semanas) ---------- */
 async function loadExcluded(){
-  if (!supabaseClient){ excludedProjects = new Set(); return; }
+  if (!supabaseClient){ excludedProjects = new Set(); endedProjects = {}; return; }
   try {
-    var res = await supabaseClient.from('app_state').select('excluded_projects').eq('id', 'global').maybeSingle();
+    var res = await supabaseClient.from('app_state').select('excluded_projects, ended_projects').eq('id', 'global').maybeSingle();
     var arr = (res.data && Array.isArray(res.data.excluded_projects)) ? res.data.excluded_projects : [];
     excludedProjects = new Set(arr);
+    var ended = res.data && res.data.ended_projects;
+    endedProjects = (ended && typeof ended === 'object' && !Array.isArray(ended)) ? ended : {};
   } catch (e) {
     excludedProjects = new Set();
+    endedProjects = {};
   }
 }
 async function persistExcluded(){
@@ -2618,8 +2633,8 @@ async function persistExcluded(){
 function updateExcludedButtonLabel(){
   var btn = document.getElementById('btnManageExcluded');
   if (!btn) return;
-  var n = excludedProjects.size;
-  btn.textContent = n ? ('Projetos excluídos (' + n + ')') : 'Projetos excluídos';
+  var n = excludedProjects.size + Object.keys(endedProjects).length;
+  btn.textContent = n ? ('Projetos excluídos / encerrados (' + n + ')') : 'Projetos excluídos / encerrados';
 }
 async function excludeProject(project){
   excludedProjects.add(project);
@@ -2628,6 +2643,22 @@ async function excludeProject(project){
   updateExcludedButtonLabel();
   render();
   showToast('"' + project + '" foi excluído do painel em todas as semanas. Use "Projetos excluídos" para reincluí-lo.', '');
+}
+async function endProject(project, fromWeek){
+  endedProjects[project] = fromWeek;
+  if (state.isolatedProject === project){ state.isolatedProject = null; state.trendMode = false; }
+  await persistExcluded();
+  updateExcludedButtonLabel();
+  render();
+  showToast('"' + project + '" foi encerrado a partir da semana ' + fromWeek + '. As semanas anteriores continuam no painel.', '');
+}
+async function reopenProject(project){
+  delete endedProjects[project];
+  await persistExcluded();
+  updateExcludedButtonLabel();
+  renderExcludedList();
+  render();
+  showToast('"' + project + '" voltou a aparecer em todas as semanas.', '');
 }
 async function includeProject(project){
   excludedProjects.delete(project);
@@ -2640,10 +2671,36 @@ async function includeProject(project){
 
 /* ---------- confirmação antes de excluir um projeto ---------- */
 var pendingExcludeProject = null;
+var pendingExcludeMode = 'exclude';   // 'exclude' (todas as semanas) | 'end' (desta semana em diante)
+var pendingEndWeek = null;
+function setExcludeConfirmTexts(title, text, yesLabel){
+  var titleEl = document.getElementById('excludeConfirmTitle');
+  var textEl = document.getElementById('excludeConfirmText');
+  var yesBtn = document.getElementById('excludeConfirmYes');
+  if (titleEl) titleEl.textContent = title;
+  if (textEl) textEl.textContent = text;
+  if (yesBtn) yesBtn.textContent = yesLabel;
+}
 function openExcludeConfirm(project){
   pendingExcludeProject = project;
-  var textEl = document.getElementById('excludeConfirmText');
-  if (textEl) textEl.textContent = 'O projeto "' + project + '" será removido do gráfico, da tabela e dos indicadores em todas as semanas. Você pode reincluí-lo depois em "Projetos excluídos".';
+  pendingExcludeMode = 'exclude';
+  setExcludeConfirmTexts(
+    'Excluir projeto de todas as semanas?',
+    'O projeto "' + project + '" será removido do gráfico, da tabela e dos indicadores em TODAS as semanas, inclusive as anteriores — o histórico e o SPI global das semanas passadas também mudam. Se o projeto só terminou ou saiu do acompanhamento, use "Encerrar" em vez disso. Você pode reincluí-lo depois em "Projetos excluídos / encerrados".',
+    'Sim, excluir de todas'
+  );
+  var overlay = document.getElementById('excludeConfirmOverlay');
+  if (overlay) overlay.hidden = false;
+}
+function openEndConfirm(project, fromWeek){
+  pendingExcludeProject = project;
+  pendingExcludeMode = 'end';
+  pendingEndWeek = fromWeek;
+  setExcludeConfirmTexts(
+    'Encerrar projeto a partir desta semana?',
+    'O projeto "' + project + '" deixa de aparecer a partir da semana ' + fromWeek + ' (inclusive). As semanas anteriores continuam iguais no gráfico, no histórico e no SPI global. Você pode desfazer depois em "Projetos excluídos / encerrados".',
+    'Sim, encerrar'
+  );
   var overlay = document.getElementById('excludeConfirmOverlay');
   if (overlay) overlay.hidden = false;
 }
@@ -2651,6 +2708,7 @@ function closeExcludeConfirm(){
   var overlay = document.getElementById('excludeConfirmOverlay');
   if (overlay) overlay.hidden = true;
   pendingExcludeProject = null;
+  pendingEndWeek = null;
 }
 function initExcludeConfirm(){
   var overlay = document.getElementById('excludeConfirmOverlay');
@@ -2659,9 +2717,11 @@ function initExcludeConfirm(){
   var yesBtn = document.getElementById('excludeConfirmYes');
   if (noBtn) noBtn.addEventListener('click', closeExcludeConfirm);
   if (yesBtn) yesBtn.addEventListener('click', function(){
-    var p = pendingExcludeProject;
+    var p = pendingExcludeProject, mode = pendingExcludeMode, wk = pendingEndWeek;
     closeExcludeConfirm();
-    if (p) excludeProject(p);
+    if (!p) return;
+    if (mode === 'end' && wk) endProject(p, wk);
+    else excludeProject(p);
   });
   overlay.addEventListener('click', function(e){ if (e.target === overlay) closeExcludeConfirm(); });
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closeExcludeConfirm(); });
@@ -2671,11 +2731,29 @@ function renderExcludedList(){
   if (!wrap) return;
   wrap.innerHTML = '';
   var list = Array.from(excludedProjects).sort();
-  if (!list.length){
-    var e = document.createElement('div'); e.className = 'excluded-empty'; e.textContent = 'Nenhum projeto excluído.';
+  var endedList = Object.keys(endedProjects).sort();
+  if (!list.length && !endedList.length){
+    var e = document.createElement('div'); e.className = 'excluded-empty'; e.textContent = 'Nenhum projeto excluído ou encerrado.';
     wrap.appendChild(e);
     return;
   }
+  function sectionHead(txt){
+    var h = document.createElement('div'); h.className = 'excluded-section'; h.textContent = txt;
+    wrap.appendChild(h);
+  }
+  if (endedList.length){
+    sectionHead('Encerrados (somem só a partir da semana indicada)');
+    endedList.forEach(function(p){
+      var row = document.createElement('div'); row.className = 'excluded-row';
+      var name = document.createElement('span'); name.className = 'excluded-name';
+      name.textContent = p + ' — a partir de ' + endedProjects[p];
+      var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn small'; btn.textContent = 'Desfazer';
+      btn.addEventListener('click', function(){ reopenProject(p); });
+      row.appendChild(name); row.appendChild(btn);
+      wrap.appendChild(row);
+    });
+  }
+  if (list.length) sectionHead('Excluídos (removidos de todas as semanas)');
   list.forEach(function(p){
     var row = document.createElement('div'); row.className = 'excluded-row';
     var name = document.createElement('span'); name.className = 'excluded-name'; name.textContent = p;
@@ -2732,63 +2810,9 @@ function previousWeekOf(weekLabel){
 }
 function rowsForWeek(weekLabel){
   return DATA.filter(function(d){
-    return d.week === weekLabel && state.companies.has(d.company) && state.scopes.has(d.scope) && !excludedProjects.has(d.project);
+    return d.week === weekLabel && state.companies.has(d.company) && state.scopes.has(d.scope) && !isHiddenRow(d);
   });
 }
-
-/* ---------- histórico do SPI global (sparkline do card "SPI Global") ---------- */
-// Reaproveita os mesmos filtros de empresa/escopo/exclusão da seleção atual (rowsForWeek),
-// olhando para trás a partir da semana selecionada — assim a linha reflete o que o KPI
-// ao lado está mostrando, inclusive quando o usuário filtra por empresa.
-function globalSpiHistory(maxPoints){
-  var idx = weeks.indexOf(state.week);
-  if (idx < 0) return [];
-  var start = Math.max(0, idx - (maxPoints - 1));
-  var out = [];
-  weeks.slice(start, idx + 1).forEach(function(w){
-    var spi = weightedSpi(rowsForWeek(w));
-    if (spi !== null) out.push({ week: w, spi: spi });
-  });
-  return out;
-}
-function renderKpiSpark(){
-  var wrap = document.getElementById('kpiSpark');
-  var svg = document.getElementById('kpiSparkSvg');
-  if (!wrap || !svg) return;
-  var hist = globalSpiHistory(12);
-  while (svg.firstChild) svg.removeChild(svg.firstChild);
-  if (hist.length < 2){ wrap.hidden = true; return; }
-  wrap.hidden = false;
-  wrap.title = 'SPI global · ' + hist[0].week + ' – ' + hist[hist.length - 1].week;
-
-  var vals = hist.map(function(h){ return h.spi; });
-  var n = vals.length;
-  var W = 100, H = 40, M = 4;
-  var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
-  var pad = (hi - lo) * 0.2 || 0.01;
-  lo -= pad; hi += pad;
-  function x(i){ return M + (i / (n - 1)) * (W - 2 * M); }
-  function y(v){ return H - M - ((v - lo) / (hi - lo)) * (H - 2 * M); }
-
-  var svgns = 'http://www.w3.org/2000/svg';
-  if (n > 2){
-    var mutedPts = vals.slice(0, -1).map(function(v, i){ return x(i) + ',' + y(v); }).join(' L ');
-    var mutedPath = document.createElementNS(svgns, 'path');
-    mutedPath.setAttribute('d', 'M ' + mutedPts);
-    mutedPath.setAttribute('class', 'spark-muted');
-    svg.appendChild(mutedPath);
-  }
-  var accentPath = document.createElementNS(svgns, 'path');
-  accentPath.setAttribute('d', 'M ' + x(n - 2) + ',' + y(vals[n - 2]) + ' L ' + x(n - 1) + ',' + y(vals[n - 1]));
-  accentPath.setAttribute('class', 'spark-accent');
-  svg.appendChild(accentPath);
-  var dot = document.createElementNS(svgns, 'circle');
-  dot.setAttribute('cx', x(n - 1)); dot.setAttribute('cy', y(vals[n - 1]));
-  dot.setAttribute('r', '3.2');
-  dot.setAttribute('class', 'spark-dot');
-  svg.appendChild(dot);
-}
-
 var SPI_EPSILON = 0.0005;
 function computeWeeklyComparison(currentWeek, previousWeek){
   var curRows = rowsForWeek(currentWeek);
@@ -3299,7 +3323,6 @@ function render(){
 
   document.getElementById('kpiAvgSpi').textContent = sumSched > 0 ? fmtSpi(spiGlobal) : '—';
   document.getElementById('kpiAvgSpiSub').textContent = 'ponderado por duração · ' + rows.length + ' projeto(s)';
-  renderKpiSpark();
   document.getElementById('kpiGood').textContent = good;
   document.getElementById('kpiGoodSub').textContent = withSpi.length ? Math.round(good / withSpi.length * 100) + '% da seleção' : ' ';
   document.getElementById('kpiWarn').textContent = warn;
@@ -3466,12 +3489,23 @@ function render(){
       var excludeBtn = document.createElement('button');
       excludeBtn.type = 'button';
       excludeBtn.className = 'btn ghost small exclude-row';
+      var endBtn = document.createElement('button');
+      endBtn.type = 'button';
+      endBtn.className = 'btn ghost small exclude-row';
+      endBtn.textContent = 'Encerrar';
+      endBtn.title = 'Esconde "' + d.project + '" a partir da semana ' + d.week + ' — as semanas anteriores continuam no painel';
+      endBtn.addEventListener('click', function(e){
+        e.stopPropagation();
+        openEndConfirm(d.project, d.week);
+      });
+      tdActions.appendChild(endBtn);
       excludeBtn.textContent = 'Excluir projeto';
-      excludeBtn.title = 'Remove "' + d.project + '" do painel em todas as semanas (reversível em "Projetos excluídos")';
+      excludeBtn.title = 'Remove "' + d.project + '" do painel em TODAS as semanas, inclusive as anteriores (reversível em "Projetos excluídos / encerrados")';
       excludeBtn.addEventListener('click', function(e){
         e.stopPropagation();
         openExcludeConfirm(d.project);
       });
+      excludeBtn.style.marginLeft = '6px';
       tdActions.appendChild(excludeBtn);
       tr.appendChild(tdActions);
 
