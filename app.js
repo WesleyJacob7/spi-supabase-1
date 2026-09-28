@@ -1185,6 +1185,7 @@ function renderReminderAlertItems(container, items, showButton, emptyMessage){
   });
 }
 function renderReminderAlert(){
+  renderNoReplyAlert(); // card "Sem resposta do PM", também depende do pmEmailLogSummary
   renderEmailDueAlert(); // card independente ("E-mail original pendente"), mas atualizado junto por depender do mesmo pmEmailLogSummary
   var card = document.getElementById('reminderAlertCard');
   var list = document.getElementById('reminderAlertList');
@@ -1271,6 +1272,175 @@ function renderEmailDueAlert(){
     line.appendChild(btn);
     list.appendChild(line);
   });
+}
+
+/* ---------- card "Sem resposta do PM" (painel do Wesley) ----------
+   Lista, entre os projetos da semana mais recente (sem excluídos/encerrados),
+   os que têm e-mail original de SPI enviado mas nenhuma resposta do PM
+   registrada no histórico DEPOIS desse último envio — independente de já ter
+   passado 1 semana ou de já ter mandado lembrete (diferente do card
+   "Lembretes pendentes", que só mostra o que precisa de ação agora).
+   Agrupado por PM (pelo e-mail do PM, para não misturar PMs de mesmo nome em
+   empresas diferentes), com botão para copiar a mensagem informal de cobrança
+   só com os projetos que realmente precisam de resposta. Projetos que saíram
+   com SPI Bom no envio ficam numa lista separada, recolhida. */
+function noReplyAlertLists(){
+  var now = new Date();
+  var dayMs = 24 * 60 * 60 * 1000;
+  var seen = {};
+  var needsReply = [];
+  var goodAtSend = [];
+  latestWeekRows().forEach(function(row){
+    if (seen[row.project]) return;
+    seen[row.project] = true;
+    var s = pmEmailLogSummary[row.project];
+    if (!s || !s.lastEmailSent) return;
+    var sentDate = new Date(s.lastEmailSent);
+    if (isNaN(sentDate.getTime())) return;
+    var lastReply = s.lastReply ? new Date(s.lastReply) : null;
+    if (lastReply && lastReply >= sentDate) return; // já respondeu depois do último envio
+    var frozenStatus = s.lastEmailSentStatus;
+    if (!frozenStatus){
+      var hist = historicalRowAtOrBefore(row.project, sentDate);
+      frozenStatus = statusOf(hist ? hist.spi : row.spi);
+    }
+    var lastReminder = s.lastReminder ? new Date(s.lastReminder) : null;
+    var entry = {
+      row: row,
+      status: frozenStatus,
+      sentIso: isoDateOnly(sentDate),
+      reminderIso: (lastReminder && lastReminder > sentDate) ? isoDateOnly(lastReminder) : null,
+      daysSince: Math.floor((now - sentDate) / dayMs),
+      pmName: row.pm_name || pmNameForProject(row.project) || '',
+      pmEmail: row.pm_email || pmEmailForProject(row.project) || ''
+    };
+    if (frozenStatus === 'good') goodAtSend.push(entry); else needsReply.push(entry);
+  });
+  return { needsReply: needsReply, goodAtSend: goodAtSend };
+}
+function groupNoReplyByPm(entries){
+  var groups = {};
+  var order = [];
+  entries.forEach(function(e){
+    var key = (e.pmEmail || e.pmName || '(sem PM cadastrado)').toLowerCase();
+    if (!groups[key]){
+      groups[key] = { pmName: e.pmName || '(sem PM cadastrado)', company: e.row.company, items: [] };
+      order.push(key);
+    }
+    groups[key].items.push(e);
+  });
+  var list = order.map(function(k){ return groups[k]; });
+  list.forEach(function(g){
+    g.items.sort(function(a, b){ return b.daysSince - a.daysSince; });
+    // mesmo PM pode ter o nome digitado diferente em projetos diferentes
+    // (ex.: "Wallce"/"Wallace") — usa o nome que mais aparece no grupo.
+    var count = {};
+    g.items.forEach(function(e){ if (e.pmName) count[e.pmName] = (count[e.pmName] || 0) + 1; });
+    var best = Object.keys(count).sort(function(a, b){ return (count[b] - count[a]) || (b.length - a.length); })[0];
+    if (best) g.pmName = best;
+  });
+  list.sort(function(a, b){
+    var da = a.items[0].daysSince, db = b.items[0].daysSince;
+    if (db !== da) return db - da;
+    return a.pmName.localeCompare(b.pmName);
+  });
+  return list;
+}
+function noReplyChatMessage(group){
+  var first = (group.pmName || '').split(' ')[0];
+  var lines = [
+    'Fala ' + first + ', bom dia!',
+    'blz?',
+    'Consegue da uma olhada fazendo favor nos e-mails que enviei do SPI dos projetos e me da um retorno?',
+    'vlw!!',
+    ''
+  ];
+  group.items.forEach(function(e){ lines.push('- ' + e.row.project); });
+  return lines.join('\n');
+}
+function renderNoReplyGroups(container, groups, actionable){
+  container.innerHTML = '';
+  groups.forEach(function(g){
+    var box = document.createElement('div');
+    box.className = 'noreply-group';
+    var head = document.createElement('div');
+    head.className = 'noreply-group-head';
+    var title = document.createElement('span');
+    title.className = 'noreply-group-title';
+    title.textContent = g.pmName + ' · ' + g.company + ' — ' + g.items.length + (g.items.length === 1 ? ' projeto' : ' projetos');
+    head.appendChild(title);
+    if (actionable){
+      var copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn ghost small';
+      copyBtn.textContent = 'Copiar cobrança';
+      copyBtn.title = 'Copia a mensagem de cobrança (chat) para este PM com os projetos abaixo';
+      copyBtn.addEventListener('click', function(){
+        copyTextToClipboard(noReplyChatMessage(g)).then(function(ok){
+          showToast(ok ? ('Mensagem para ' + g.pmName + ' copiada — é só colar no chat.') : 'Não foi possível copiar a mensagem neste navegador.', ok ? undefined : 'warn');
+        });
+      });
+      head.appendChild(copyBtn);
+    }
+    box.appendChild(head);
+    g.items.forEach(function(e){
+      var line = document.createElement('div');
+      line.className = 'reminder-alert-item';
+      var info = document.createElement('div');
+      info.className = 'reminder-alert-info';
+      var name = document.createElement('span');
+      name.className = 'reminder-alert-project';
+      name.textContent = projectLabel(e.row);
+      info.appendChild(name);
+      var sub = document.createElement('span');
+      sub.className = 'reminder-alert-days';
+      var statusTxt = e.status === 'crit' ? 'Crítico' : (e.status === 'warn' ? 'Atenção' : 'Bom');
+      sub.textContent = 'E-mail enviado em ' + fmtDateMDY(e.sentIso) + ' (há ' + e.daysSince + (e.daysSince === 1 ? ' dia' : ' dias') + ')'
+        + ' · SPI ' + statusTxt + ' no envio'
+        + ' · ' + (e.reminderIso ? ('lembrete em ' + fmtDateMDY(e.reminderIso)) : 'sem lembrete');
+      info.appendChild(sub);
+      line.appendChild(info);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn ghost small';
+      btn.textContent = 'Histórico de e-mails';
+      btn.title = 'Abrir o histórico para colar a resposta do PM';
+      btn.addEventListener('click', function(){ openEmailHistory(e.row); });
+      line.appendChild(btn);
+      box.appendChild(line);
+    });
+    container.appendChild(box);
+  });
+}
+function renderNoReplyAlert(){
+  var card = document.getElementById('noReplyAlertCard');
+  var list = document.getElementById('noReplyAlertList');
+  var titleEl = document.getElementById('noReplyAlertTitle');
+  var goodSection = document.getElementById('noReplyAlertGoodSection');
+  var goodList = document.getElementById('noReplyAlertGoodList');
+  var goodTitle = document.getElementById('noReplyAlertGoodTitle');
+  if (!card || !list) return;
+  var lists = noReplyAlertLists();
+  var total = lists.needsReply.length + lists.goodAtSend.length;
+  card.hidden = !total;
+  if (!total){ list.innerHTML = ''; if (goodList) goodList.innerHTML = ''; return; }
+  if (titleEl){
+    var n = lists.needsReply.length;
+    titleEl.textContent = 'Sem resposta do PM — ' + n + (n === 1 ? ' projeto' : ' projetos');
+  }
+  if (!lists.needsReply.length){
+    list.innerHTML = '<div class="history-empty">Nenhum projeto com SPI em Atenção/Crítico aguardando resposta.</div>';
+  } else {
+    renderNoReplyGroups(list, groupNoReplyByPm(lists.needsReply), true);
+  }
+  if (goodSection && goodList){
+    goodSection.hidden = !lists.goodAtSend.length;
+    if (goodTitle){
+      var g = lists.goodAtSend.length;
+      goodTitle.textContent = g + (g === 1 ? ' projeto sem resposta' : ' projetos sem resposta') + ', mas com SPI bom no envio';
+    }
+    renderNoReplyGroups(goodList, groupNoReplyByPm(lists.goodAtSend), false);
+  }
 }
 
 async function refreshEmailHistory(){
