@@ -250,6 +250,14 @@ details[open] > .reminder-alert-secondary-title::before{ content:"▾ "; }
 .reminder-alert-secondary-title:hover{ color: var(--text-primary); }
 .reminder-alert-list.muted .reminder-alert-item{ opacity:.8; }
 .reminder-alert-list.muted .reminder-alert-project{ font-weight:500; }
+/* card "Sem resposta do PM" — neutro (consulta), agrupado por PM */
+.noreply-card{ padding: 16px 20px 18px; border-color: var(--border); background: var(--surface-1); }
+#noReplyAlertGoodList{ margin-top:10px; }
+.noreply-card .reminder-alert-title{ color: var(--text-primary); }
+.noreply-group{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.noreply-group:last-child{ margin-bottom:0; }
+.noreply-group-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.noreply-group-title{ font-weight:700; font-size:13px; color: var(--text-secondary); }
 .card-title{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size: 19px; letter-spacing:-0.005em; }
 .card-note{ font-size: 12.5px; color: var(--text-muted); }
 .legend{ display:flex; gap:18px; align-items:center; margin: 6px 0 4px; flex-wrap:wrap; }
@@ -666,6 +674,20 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     <details class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
       <summary class="reminder-alert-secondary-title" id="reminderAlertGoodTitle">Sem lembrete necessário (SPI bom no envio)</summary>
       <div class="reminder-alert-list muted" id="reminderAlertGoodList"></div>
+    </details>
+  </div>
+
+  <div class="card reminder-alert-card noreply-card fade-in" id="noReplyAlertCard" hidden>
+    <details class="reminder-alert-main" id="noReplyAlertMainSection">
+      <summary class="reminder-alert-head">
+        <div class="reminder-alert-title" id="noReplyAlertTitle">Sem resposta do PM</div>
+        <p class="reminder-alert-sub">Projetos com e-mail de SPI enviado e nenhuma resposta do PM registrada no histórico depois do último envio, agrupados por PM.</p>
+      </summary>
+      <div class="reminder-alert-list" id="noReplyAlertList"></div>
+      <details class="reminder-alert-secondary" id="noReplyAlertGoodSection" hidden>
+        <summary class="reminder-alert-secondary-title" id="noReplyAlertGoodTitle">Sem resposta, mas com SPI bom no envio</summary>
+        <div class="reminder-alert-list muted" id="noReplyAlertGoodList"></div>
+      </details>
     </details>
   </div>
 
