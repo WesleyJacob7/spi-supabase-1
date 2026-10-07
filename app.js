@@ -1187,8 +1187,6 @@ function renderReminderAlertItems(container, items, showButton, emptyMessage){
 function renderReminderAlert(){
   renderNoReplyAlert(); // card "Sem resposta do PM", também depende do pmEmailLogSummary
   renderEmailDueAlert(); // card independente ("E-mail original pendente"), mas atualizado junto por depender do mesmo pmEmailLogSummary
-   var cnt = document.getElementById('emailDueAlertCount');
-  if (cnt) cnt.textContent = '(' + items.length + (items.length === 1 ? ' projeto)' : ' projetos)');
   var card = document.getElementById('reminderAlertCard');
   var list = document.getElementById('reminderAlertList');
   var goodSection = document.getElementById('reminderAlertGoodSection');
@@ -1248,6 +1246,9 @@ function renderEmailDueAlert(){
   if (!card || !list) return;
   var items = emailDueAlertList();
   card.hidden = !items.length;
+   var cnt = document.getElementById('emailDueAlertCount');
+  if (cnt) cnt.textContent = '(' + items.length + (items.length === 1 ? ' projeto)' : ' projetos)');
+  list.innerHTML = '';
   list.innerHTML = '';
   items.forEach(function(entry){
     var row = entry.row;
