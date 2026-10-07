@@ -2984,6 +2984,17 @@ function rowsForWeek(weekLabel){
   });
 }
 var SPI_EPSILON = 0.0005;
+// variação percentual relativa ao SPI anterior: (atual - anterior) / anterior
+function pctChange(delta, prev){
+  var p = Number(prev);
+  if (delta === null || delta === undefined || !p) return null;
+  return delta / p * 100;
+}
+function fmtPctChange(delta, prev){
+  var pc = pctChange(delta, prev);
+  if (pc === null) return '—';
+  return (pc > 0 ? '+' : '') + pc.toFixed(1).replace('.', ',') + '%';
+}
 function computeWeeklyComparison(currentWeek, previousWeek){
   var curRows = rowsForWeek(currentWeek);
   var prevRows = previousWeek ? rowsForWeek(previousWeek) : [];
@@ -3046,7 +3057,7 @@ function renderWeeklyReport(report){
       kpiDelta.textContent = '—';
     } else {
       var sign = report.globalDelta > 0 ? '+' : '';
-      kpiDelta.textContent = sign + fmtSpi(report.globalDelta);
+      kpiDelta.textContent = sign + fmtSpi(report.globalDelta) + ' (' + fmtPctChange(report.globalDelta, report.prevSpi) + ')';
       if (report.globalDelta > SPI_EPSILON) kpiDelta.classList.add('good');
       else if (report.globalDelta < -SPI_EPSILON) kpiDelta.classList.add('crit');
     }
@@ -3061,10 +3072,10 @@ function renderWeeklyReport(report){
       headline = 'Ainda não há semana anterior para comparar o indicador global.';
     } else if (report.globalDelta > SPI_EPSILON){
       summaryEl.classList.add('good');
-      headline = 'O SPI global MELHOROU: de ' + fmtSpi(report.prevSpi) + ' para ' + fmtSpi(report.curSpi) + ' (+' + fmtSpi(report.globalDelta) + ').';
+      headline = 'O SPI global MELHOROU: de ' + fmtSpi(report.prevSpi) + ' para ' + fmtSpi(report.curSpi) + ' (+' + fmtSpi(report.globalDelta) + ' | ' + fmtPctChange(report.globalDelta, report.prevSpi) + ').';
     } else if (report.globalDelta < -SPI_EPSILON){
       summaryEl.classList.add('crit');
-      headline = 'O SPI global PIOROU: de ' + fmtSpi(report.prevSpi) + ' para ' + fmtSpi(report.curSpi) + ' (' + fmtSpi(report.globalDelta) + ').';
+      headline = 'O SPI global PIOROU: de ' + fmtSpi(report.prevSpi) + ' para ' + fmtSpi(report.curSpi) + ' (' + fmtSpi(report.globalDelta) + ' | ' + fmtPctChange(report.globalDelta, report.prevSpi) + ').';
     } else {
       headline = 'O SPI global se manteve estável em ' + fmtSpi(report.curSpi) + '.';
     }
@@ -3095,7 +3106,7 @@ function renderWeeklyReport(report){
       var name = document.createElement('span'); name.className = 'report-row-name'; name.textContent = item.project + ' (' + item.company + ')';
       var vals = document.createElement('span'); vals.className = 'report-row-vals';
       var sign = item.delta > 0 ? '+' : '';
-      vals.innerHTML = fmtSpi(item.prevSpi) + ' <span class="report-arrow">&rarr;</span> ' + fmtSpi(item.curSpi) + ' <span class="report-delta ' + cls + '">(' + sign + fmtSpi(item.delta) + ')</span>';
+      vals.innerHTML = fmtSpi(item.prevSpi) + ' <span class="report-arrow">&rarr;</span> ' + fmtSpi(item.curSpi) + ' <span class="report-delta ' + cls + '">(' + sign + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ')</span>';
       row.appendChild(name); row.appendChild(vals);
       wrap.appendChild(row);
     });
@@ -3124,7 +3135,7 @@ function buildReportText(report){
     lines.push('Indicador global: ' + trend);
     lines.push('SPI semana anterior: ' + fmtSpi(report.prevSpi));
     lines.push('SPI semana atual: ' + fmtSpi(report.curSpi));
-    lines.push('Variação: ' + (report.globalDelta > 0 ? '+' : '') + fmtSpi(report.globalDelta));
+    lines.push('Variação: ' + (report.globalDelta > 0 ? '+' : '') + fmtSpi(report.globalDelta) + ' (' + fmtPctChange(report.globalDelta, report.prevSpi) + ')');
   }
   lines.push('');
   lines.push('RESUMO: ' + report.improved.length + ' projeto(s) melhoraram, ' + report.worsened.length + ' projeto(s) pioraram, ' + report.unchanged.length + ' sem mudança.');
@@ -3132,13 +3143,13 @@ function buildReportText(report){
   lines.push('PROJETOS QUE MELHORARAM (' + report.improved.length + ')');
   if (!report.improved.length) lines.push('  Nenhum.');
   report.improved.forEach(function(item){
-    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (+' + fmtSpi(item.delta) + ')');
+    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (+' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ')');
   });
   lines.push('');
   lines.push('PROJETOS QUE PIORARAM (' + report.worsened.length + ')');
   if (!report.worsened.length) lines.push('  Nenhum.');
   report.worsened.forEach(function(item){
-    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (' + fmtSpi(item.delta) + ')');
+    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ')');
   });
   if (report.onlyInCurrent.length){
     lines.push('');
@@ -3264,22 +3275,23 @@ function buildReportXlsxBlob(report){
     addRow(['SPI semana anterior', fmtSpi(report.prevSpi)]);
     addRow(['SPI semana atual', fmtSpi(report.curSpi)]);
     addRow(['Variação', (report.globalDelta > 0 ? '+' : '') + fmtSpi(report.globalDelta)]);
+    addRow(['Variação %', fmtPctChange(report.globalDelta, report.prevSpi)]);
   }
   addRow([]);
   addRow(['Resumo', report.improved.length + ' melhoraram, ' + report.worsened.length + ' pioraram, ' + report.unchanged.length + ' sem mudança']);
   addRow([]);
   addRow(['Projetos que melhoraram (' + report.improved.length + ')']);
-  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação']);
+  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação', 'Variação %']);
   if (!report.improved.length) addRow(['Nenhum']);
   report.improved.forEach(function(item){
-    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), '+' + fmtSpi(item.delta)]);
+    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), '+' + fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi)]);
   });
   addRow([]);
   addRow(['Projetos que pioraram (' + report.worsened.length + ')']);
-  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação']);
+  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação', 'Variação %']);
   if (!report.worsened.length) addRow(['Nenhum']);
   report.worsened.forEach(function(item){
-    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), fmtSpi(item.delta)]);
+    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi)]);
   });
   if (report.onlyInCurrent.length){
     addRow([]);
