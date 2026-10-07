@@ -2990,6 +2990,21 @@ function pctChange(delta, prev){
   if (delta === null || delta === undefined || !p) return null;
   return delta / p * 100;
 }
+// % físico (pct_complete guardado como fração 0–1): variação em pontos percentuais
+function fmtPhysPct(v){
+  var n = Number(v);
+  if (v === null || v === undefined || isNaN(n)) return '—';
+  return Math.round(n * 100) + '%';
+}
+function fmtPhysDelta(prev, cur){
+  var a = Number(prev), b = Number(cur);
+  if (prev === null || prev === undefined || cur === null || cur === undefined || isNaN(a) || isNaN(b)) return '—';
+  var d = Math.round(b * 100) - Math.round(a * 100);
+  return (d > 0 ? '+' : '') + d + ' p.p.';
+}
+function physLine(item){
+  return '% físico: ' + fmtPhysPct(item.prevPct) + ' → ' + fmtPhysPct(item.curPct) + ' (' + fmtPhysDelta(item.prevPct, item.curPct) + ')';
+}
 function fmtPctChange(delta, prev){
   var pc = pctChange(delta, prev);
   if (pc === null) return '—';
@@ -3008,7 +3023,7 @@ function computeWeeklyComparison(currentWeek, previousWeek){
     var prev = prevByProject[d.project];
     if (!prev){ onlyInCurrent.push(d); return; }
     var delta = (Number(d.spi) || 0) - (Number(prev.spi) || 0);
-    var item = { project: d.project, company: d.company, prevSpi: prev.spi, curSpi: d.spi, delta: delta };
+    var item = { project: d.project, company: d.company, prevSpi: prev.spi, curSpi: d.spi, delta: delta, prevPct: prev.pct_complete, curPct: d.pct_complete };
     if (delta > SPI_EPSILON) improved.push(item);
     else if (delta < -SPI_EPSILON) worsened.push(item);
     else unchanged.push(item);
@@ -3104,9 +3119,14 @@ function renderWeeklyReport(report){
     list.forEach(function(item){
       var row = document.createElement('div'); row.className = 'report-row';
       var name = document.createElement('span'); name.className = 'report-row-name'; name.textContent = item.project + ' (' + item.company + ')';
-      var vals = document.createElement('span'); vals.className = 'report-row-vals';
+      var vals = document.createElement('span'); vals.className = 'report-row-vals'; vals.style.textAlign = 'right';
       var sign = item.delta > 0 ? '+' : '';
       vals.innerHTML = fmtSpi(item.prevSpi) + ' <span class="report-arrow">&rarr;</span> ' + fmtSpi(item.curSpi) + ' <span class="report-delta ' + cls + '">(' + sign + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ')</span>';
+      var physEl = document.createElement('span');
+      physEl.className = 'report-row-phys';
+      physEl.style.cssText = 'display:block;font-size:11px;color:var(--text-muted);text-align:right;margin-top:2px;';
+      physEl.textContent = physLine(item);
+      vals.appendChild(physEl);
       row.appendChild(name); row.appendChild(vals);
       wrap.appendChild(row);
     });
@@ -3143,13 +3163,13 @@ function buildReportText(report){
   lines.push('PROJETOS QUE MELHORARAM (' + report.improved.length + ')');
   if (!report.improved.length) lines.push('  Nenhum.');
   report.improved.forEach(function(item){
-    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (+' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ')');
+    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (+' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ') | ' + physLine(item));
   });
   lines.push('');
   lines.push('PROJETOS QUE PIORARAM (' + report.worsened.length + ')');
   if (!report.worsened.length) lines.push('  Nenhum.');
   report.worsened.forEach(function(item){
-    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ')');
+    lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ') | ' + physLine(item));
   });
   if (report.onlyInCurrent.length){
     lines.push('');
@@ -3281,17 +3301,17 @@ function buildReportXlsxBlob(report){
   addRow(['Resumo', report.improved.length + ' melhoraram, ' + report.worsened.length + ' pioraram, ' + report.unchanged.length + ' sem mudança']);
   addRow([]);
   addRow(['Projetos que melhoraram (' + report.improved.length + ')']);
-  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação', 'Variação %']);
+  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação', 'Variação %', '% físico anterior', '% físico atual', 'Variação % físico']);
   if (!report.improved.length) addRow(['Nenhum']);
   report.improved.forEach(function(item){
-    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), '+' + fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi)]);
+    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), '+' + fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi), fmtPhysPct(item.prevPct), fmtPhysPct(item.curPct), fmtPhysDelta(item.prevPct, item.curPct)]);
   });
   addRow([]);
   addRow(['Projetos que pioraram (' + report.worsened.length + ')']);
-  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação', 'Variação %']);
+  addRow(['Projeto', 'Empresa', 'SPI anterior', 'SPI atual', 'Variação', 'Variação %', '% físico anterior', '% físico atual', 'Variação % físico']);
   if (!report.worsened.length) addRow(['Nenhum']);
   report.worsened.forEach(function(item){
-    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi)]);
+    addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi), fmtPhysPct(item.prevPct), fmtPhysPct(item.curPct), fmtPhysDelta(item.prevPct, item.curPct)]);
   });
   if (report.onlyInCurrent.length){
     addRow([]);
