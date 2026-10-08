@@ -346,6 +346,13 @@ function pmNameForProject(project){
 
 /* ---------- status-update e-mail generation (mirrors the e-mail templates doc) ---------- */
 function emailFmtSpi(v){ return (typeof v === 'number' ? v : 0).toFixed(2).replace('.', ','); }
+// Status do SPI "congelado" no envio, para as regras de cobrança: SPI = 1,00
+// conta como Bom, porque o e-mail com SPI 1,00 é só informativo (não traz
+// perguntas) — não faz sentido cobrar lembrete/resposta dele.
+function sendStatusForFollowUp(status, spiValue){
+  if (typeof spiValue === 'number' && emailFmtSpi(spiValue) === '1,00') return 'good';
+  return status;
+}
 function emailFmtDate(iso){
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
   if (!m) return iso || '';
@@ -1117,6 +1124,8 @@ function reminderAlertLists(){
     var frozenStatus = summary && summary.lastEmailSentStatus ? summary.lastEmailSentStatus : statusOf(row.spi);
     var sentDate = new Date(lastSentIso);
     if (isNaN(sentDate.getTime())) return;
+    var frozenSpiAtSend = (summary && typeof summary.lastEmailSentSpiValue === 'number') ? summary.lastEmailSentSpiValue : (function(){ var h = historicalRowAtOrBefore(row.project, sentDate); return h ? h.spi : row.spi; })();
+    frozenStatus = sendStatusForFollowUp(frozenStatus, frozenSpiAtSend);
     var daysSince = Math.floor((now - sentDate) / dayMs);
     if (daysSince < 7) return;
     var lastReminder = summary && summary.lastReminder ? new Date(summary.lastReminder) : null;
@@ -1218,7 +1227,7 @@ function renderReminderAlert(){
     var goodTitle = document.getElementById('reminderAlertGoodTitle');
     if (goodTitle){
       var n = lists.goodAtSend.length;
-      goodTitle.textContent = n + (n === 1 ? ' projeto não precisa' : ' projetos não precisam') + ' de lembrete (SPI bom no envio)';
+      goodTitle.textContent = n + (n === 1 ? ' projeto não precisa' : ' projetos não precisam') + ' de lembrete (SPI ≥ 1,00 no envio)';
     }
     renderReminderAlertItems(goodList, lists.goodAtSend, false, null);
   }
@@ -1310,10 +1319,11 @@ function noReplyAlertLists(){
     var lastReply = s.lastReply ? new Date(s.lastReply) : null;
     if (lastReply && lastReply >= sentDate) return; // já respondeu depois do último envio
     var frozenStatus = s.lastEmailSentStatus;
+    var hist = (!frozenStatus || typeof s.lastEmailSentSpiValue !== 'number') ? historicalRowAtOrBefore(row.project, sentDate) : null;
     if (!frozenStatus){
-      var hist = historicalRowAtOrBefore(row.project, sentDate);
       frozenStatus = statusOf(hist ? hist.spi : row.spi);
     }
+    frozenStatus = sendStatusForFollowUp(frozenStatus, typeof s.lastEmailSentSpiValue === 'number' ? s.lastEmailSentSpiValue : (hist ? hist.spi : row.spi));
     var lastReminder = s.lastReminder ? new Date(s.lastReminder) : null;
     var entry = {
       row: row,
@@ -1447,7 +1457,7 @@ function renderNoReplyAlert(){
     goodSection.hidden = !lists.goodAtSend.length;
     if (goodTitle){
       var g = lists.goodAtSend.length;
-      goodTitle.textContent = g + (g === 1 ? ' projeto sem resposta' : ' projetos sem resposta') + ', mas com SPI bom no envio';
+      goodTitle.textContent = g + (g === 1 ? ' projeto sem resposta' : ' projetos sem resposta') + ', mas com SPI ≥ 1,00 no envio';
     }
     renderNoReplyGroups(goodList, groupNoReplyByPm(lists.goodAtSend), false);
   }
