@@ -361,6 +361,13 @@ function buildEmailSubject(d){
 }
 
 function buildEmailQuestions(d){
+  // Projeto que já tem resposta do PM registrada no histórico (pm_email_log):
+  // no lugar das perguntas do primeiro e-mail, uma pergunta só, pedindo
+  // ações/atualizações novas — para o PM não repetir a resposta anterior.
+  var hist = pmEmailLogSummary[d.project];
+  if (hist && hist.lastReply){
+    return ['Temos mais alguma ação/atualização no projeto para recuperação do schedule?'];
+  }
   var qs = [];
   if (d.pct_complete <= 0.90){
     qs.push('Quais ações podem ser realizadas para recuperar esse indicador?');
