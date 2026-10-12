@@ -3010,6 +3010,11 @@ function fmtPctChange(delta, prev){
   if (pc === null) return '—';
   return (pc > 0 ? '+' : '') + pc.toFixed(1).replace('.', ',') + '%';
 }
+var REPORT_COMPANY_ORDER = ['JKA', 'Prestige'];
+function reportCompanyRank(company){
+  var i = REPORT_COMPANY_ORDER.indexOf(String(company || '').trim());
+  return i === -1 ? REPORT_COMPANY_ORDER.length : i;
+}
 function computeWeeklyComparison(currentWeek, previousWeek){
   var curRows = rowsForWeek(currentWeek);
   var prevRows = previousWeek ? rowsForWeek(previousWeek) : [];
@@ -3031,8 +3036,9 @@ function computeWeeklyComparison(currentWeek, previousWeek){
   prevRows.forEach(function(d){
     if (!curByProject[d.project]) onlyInPrevious.push(d);
   });
-  improved.sort(function(a, b){ return b.delta - a.delta; });
-  worsened.sort(function(a, b){ return a.delta - b.delta; });
+  // agrupa por empresa (JKA primeiro, depois Prestige, depois outras); dentro de cada empresa, maior variação primeiro
+  improved.sort(function(a, b){ return (reportCompanyRank(a.company) - reportCompanyRank(b.company)) || (b.delta - a.delta); });
+  worsened.sort(function(a, b){ return (reportCompanyRank(a.company) - reportCompanyRank(b.company)) || (a.delta - b.delta); });
 
   var curSpi = weightedSpi(curRows);
   var prevSpi = previousWeek ? weightedSpi(prevRows) : null;
@@ -3116,7 +3122,17 @@ function renderWeeklyReport(report){
       wrap.appendChild(e);
       return;
     }
+    var lastCompany = null;
     list.forEach(function(item){
+      if (item.company !== lastCompany){
+        lastCompany = item.company;
+        var count = list.filter(function(x){ return x.company === item.company; }).length;
+        var head = document.createElement('div');
+        head.className = 'report-company-head';
+        head.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);padding:10px 0 4px;border-bottom:1px solid var(--border, rgba(127,127,127,.25));';
+        head.textContent = (item.company || 'Sem empresa') + ' (' + count + ')';
+        wrap.appendChild(head);
+      }
       var row = document.createElement('div'); row.className = 'report-row';
       var name = document.createElement('span'); name.className = 'report-row-name'; name.textContent = item.project + ' (' + item.company + ')';
       var vals = document.createElement('span'); vals.className = 'report-row-vals'; vals.style.textAlign = 'right';
