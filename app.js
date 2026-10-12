@@ -956,6 +956,14 @@ function mergeSyntheticEmailSentEntry(entries, row){
    sentido na visão admin (index.html); nas visões JKA/Prestige o elemento
    nem existe no HTML. */
 var pmEmailLogSummary = {};
+// Não cobra lembrete/resposta de e-mail que saiu com SPI Bom (> 1,00) ou com
+// SPI exatamente 1,00 (e-mail só informativo, sem perguntas). O status gravado
+// continua 'warn' (Atenção) para SPI 1,00 — só a regra de cobrança o ignora.
+function noChargeAtSend(status, spiValue){
+  if (status === 'good') return true;
+  var v = (spiValue === null || spiValue === undefined || spiValue === '') ? NaN : Number(spiValue);
+  return !isNaN(v) && emailFmtSpi(v) === '1,00';
+}
 async function refreshPmEmailLogSummary(){
   if (!supabaseClient) return;
   try {
@@ -975,7 +983,7 @@ async function refreshPmEmailLogSummary(){
         if (!s.lastEmailSent || new Date(ev.created_at) > new Date(s.lastEmailSent)){
           s.lastEmailSent = ev.created_at;
           s.lastEmailSentStatus = ev.spi_status || null;
-          s.lastEmailSentSpiValue = (typeof ev.spi_value === 'number') ? ev.spi_value : null;
+          s.lastEmailSentSpiValue = (ev.spi_value !== null && ev.spi_value !== undefined && ev.spi_value !== '' && !isNaN(Number(ev.spi_value))) ? Number(ev.spi_value) : null;
           s.lastEmailSentRefDate = ev.ref_date || null;
         }
         // primeiro e-mail original já enviado a este projeto — define o
@@ -1116,7 +1124,7 @@ function reminderAlertLists(){
     var lastReply = summary && summary.lastReply ? new Date(summary.lastReply) : null;
     if (lastReminder && lastReminder > sentDate) return; // já lembrou depois deste e-mail
     if (lastReply && lastReply > sentDate) return; // já tem resposta depois deste e-mail
-    if (frozenStatus === 'good'){
+    if (noChargeAtSend(frozenStatus, summary ? summary.lastEmailSentSpiValue : null)){
       var frozenSpiValue, frozenRefDate;
       if (summary && typeof summary.lastEmailSentSpiValue === 'number' && summary.lastEmailSentRefDate){
         frozenSpiValue = summary.lastEmailSentSpiValue;
@@ -1211,7 +1219,7 @@ function renderReminderAlert(){
     var goodTitle = document.getElementById('reminderAlertGoodTitle');
     if (goodTitle){
       var n = lists.goodAtSend.length;
-      goodTitle.textContent = n + (n === 1 ? ' projeto não precisa' : ' projetos não precisam') + ' de lembrete (SPI bom no envio)';
+      goodTitle.textContent = n + (n === 1 ? ' projeto não precisa' : ' projetos não precisam') + ' de lembrete (SPI ≥ 1,00 no envio)';
     }
     renderReminderAlertItems(goodList, lists.goodAtSend, false, null);
   }
@@ -1300,9 +1308,11 @@ function noReplyAlertLists(){
     var lastReply = s.lastReply ? new Date(s.lastReply) : null;
     if (lastReply && lastReply >= sentDate) return; // já respondeu depois do último envio
     var frozenStatus = s.lastEmailSentStatus;
+    var frozenSpi = s.lastEmailSentSpiValue;
     if (!frozenStatus){
       var hist = historicalRowAtOrBefore(row.project, sentDate);
-      frozenStatus = statusOf(hist ? hist.spi : row.spi);
+      frozenSpi = hist ? hist.spi : row.spi;
+      frozenStatus = statusOf(frozenSpi);
     }
     var lastReminder = s.lastReminder ? new Date(s.lastReminder) : null;
     var entry = {
@@ -1314,7 +1324,7 @@ function noReplyAlertLists(){
       pmName: row.pm_name || pmNameForProject(row.project) || '',
       pmEmail: row.pm_email || pmEmailForProject(row.project) || ''
     };
-    if (frozenStatus === 'good') goodAtSend.push(entry); else needsReply.push(entry);
+    if (noChargeAtSend(frozenStatus, frozenSpi)) goodAtSend.push(entry); else needsReply.push(entry);
   });
   return { needsReply: needsReply, goodAtSend: goodAtSend };
 }
@@ -1437,7 +1447,7 @@ function renderNoReplyAlert(){
     goodSection.hidden = !lists.goodAtSend.length;
     if (goodTitle){
       var g = lists.goodAtSend.length;
-      goodTitle.textContent = g + (g === 1 ? ' projeto sem resposta' : ' projetos sem resposta') + ', mas com SPI bom no envio';
+      goodTitle.textContent = g + (g === 1 ? ' projeto sem resposta' : ' projetos sem resposta') + ', mas com SPI ≥ 1,00 no envio';
     }
     renderNoReplyGroups(goodList, groupNoReplyByPm(lists.goodAtSend), false);
   }
