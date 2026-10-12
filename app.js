@@ -1197,32 +1197,13 @@ function renderReminderAlert(){
   renderEmailDueAlert(); // card independente ("E-mail original pendente"), mas atualizado junto por depender do mesmo pmEmailLogSummary
   var card = document.getElementById('reminderAlertCard');
   var list = document.getElementById('reminderAlertList');
-  var goodSection = document.getElementById('reminderAlertGoodSection');
-  var goodList = document.getElementById('reminderAlertGoodList');
   if (!card || !list) return;
   var lists = reminderAlertLists();
-  if (!lists.needsReminder.length && !lists.goodAtSend.length){
-    card.hidden = true;
-    list.innerHTML = '';
-    if (goodList) goodList.innerHTML = '';
-    if (goodSection) goodSection.hidden = true;
-    return;
-  }
+  // Só mostra o que exige ação ("Lembrar PM"). Os projetos com SPI ≥ 1,00 no
+  // envio já aparecem na sublista do card "Sem resposta do PM" — não repete aqui.
   card.hidden = false;
-  // sem nada acionável agora, o card fica discreto (sem a cor de aviso) —
-  // só a lista "SPI bom no envio" some por baixo de um resumo recolhido,
-  // em vez de ocupar a tela toda hora sem ter o que fazer.
   card.classList.toggle('no-action', !lists.needsReminder.length);
   renderReminderAlertItems(list, lists.needsReminder, true, 'Tudo em dia — nenhum projeto precisa de lembrete agora.');
-  if (goodSection && goodList){
-    goodSection.hidden = !lists.goodAtSend.length;
-    var goodTitle = document.getElementById('reminderAlertGoodTitle');
-    if (goodTitle){
-      var n = lists.goodAtSend.length;
-      goodTitle.textContent = n + (n === 1 ? ' projeto não precisa' : ' projetos não precisam') + ' de lembrete (SPI ≥ 1,00 no envio)';
-    }
-    renderReminderAlertItems(goodList, lists.goodAtSend, false, null);
-  }
 }
 
 /* ---------- aviso "e-mail original pendente" (painel do Wesley) ----------
@@ -1254,6 +1235,8 @@ function renderEmailDueAlert(){
   if (!card || !list) return;
   var items = emailDueAlertList();
   card.hidden = !items.length;
+  var countEl = document.getElementById('emailDueAlertCount');
+  if (countEl) countEl.textContent = items.length ? '(' + items.length + ')' : '';
   list.innerHTML = '';
   items.forEach(function(entry){
     var row = entry.row;
@@ -1298,6 +1281,7 @@ function noReplyAlertLists(){
   var seen = {};
   var needsReply = [];
   var goodAtSend = [];
+  var answered = [];
   latestWeekRows().forEach(function(row){
     if (seen[row.project]) return;
     seen[row.project] = true;
@@ -1306,7 +1290,22 @@ function noReplyAlertLists(){
     var sentDate = new Date(s.lastEmailSent);
     if (isNaN(sentDate.getTime())) return;
     var lastReply = s.lastReply ? new Date(s.lastReply) : null;
-    if (lastReply && lastReply >= sentDate) return; // já respondeu depois do último envio
+    if (lastReply && lastReply >= sentDate){
+      // já respondeu depois do último envio — vai para a sublista "Respondidos",
+      // exceto se o e-mail mensal já venceu (aí ele está no card "E-mail original
+      // pendente" e não deve aparecer duas vezes).
+      if (projectEmailDueInfo(row.project).status === 'ok'){
+        answered.push({
+          row: row,
+          sentIso: isoDateOnly(sentDate),
+          replyIso: isoDateOnly(lastReply),
+          daysSince: Math.floor((now - sentDate) / dayMs),
+          pmName: row.pm_name || pmNameForProject(row.project) || '',
+          pmEmail: row.pm_email || pmEmailForProject(row.project) || ''
+        });
+      }
+      return;
+    }
     var frozenStatus = s.lastEmailSentStatus;
     var frozenSpi = s.lastEmailSentSpiValue;
     if (!frozenStatus){
@@ -1326,7 +1325,7 @@ function noReplyAlertLists(){
     };
     if (noChargeAtSend(frozenStatus, frozenSpi)) goodAtSend.push(entry); else needsReply.push(entry);
   });
-  return { needsReply: needsReply, goodAtSend: goodAtSend };
+  return { needsReply: needsReply, goodAtSend: goodAtSend, answered: answered };
 }
 function groupNoReplyByPm(entries){
   var groups = {};
@@ -1404,10 +1403,14 @@ function renderNoReplyGroups(container, groups, actionable){
       info.appendChild(name);
       var sub = document.createElement('span');
       sub.className = 'reminder-alert-days';
-      var statusTxt = e.status === 'crit' ? 'Crítico' : (e.status === 'warn' ? 'Atenção' : 'Bom');
-      sub.textContent = 'E-mail enviado em ' + fmtDateMDY(e.sentIso) + ' (há ' + e.daysSince + (e.daysSince === 1 ? ' dia' : ' dias') + ')'
-        + ' · SPI ' + statusTxt + ' no envio'
-        + ' · ' + (e.reminderIso ? ('lembrete em ' + fmtDateMDY(e.reminderIso)) : 'sem lembrete');
+      if (e.replyIso){
+        sub.textContent = 'E-mail enviado em ' + fmtDateMDY(e.sentIso) + ' · respondido em ' + fmtDateMDY(e.replyIso);
+      } else {
+        var statusTxt = e.status === 'crit' ? 'Crítico' : (e.status === 'warn' ? 'Atenção' : 'Bom');
+        sub.textContent = 'E-mail enviado em ' + fmtDateMDY(e.sentIso) + ' (há ' + e.daysSince + (e.daysSince === 1 ? ' dia' : ' dias') + ')'
+          + ' · SPI ' + statusTxt + ' no envio'
+          + ' · ' + (e.reminderIso ? ('lembrete em ' + fmtDateMDY(e.reminderIso)) : 'sem lembrete');
+      }
       info.appendChild(sub);
       line.appendChild(info);
       var btn = document.createElement('button');
@@ -1430,10 +1433,21 @@ function renderNoReplyAlert(){
   var goodList = document.getElementById('noReplyAlertGoodList');
   var goodTitle = document.getElementById('noReplyAlertGoodTitle');
   if (!card || !list) return;
+  var answeredSection = document.getElementById('noReplyAlertAnsweredSection');
+  var answeredList = document.getElementById('noReplyAlertAnsweredList');
+  var answeredTitle = document.getElementById('noReplyAlertAnsweredTitle');
   var lists = noReplyAlertLists();
-  var total = lists.needsReply.length + lists.goodAtSend.length;
+  var total = lists.needsReply.length + lists.goodAtSend.length + lists.answered.length;
   card.hidden = !total;
-  if (!total){ list.innerHTML = ''; if (goodList) goodList.innerHTML = ''; return; }
+  if (!total){ list.innerHTML = ''; if (goodList) goodList.innerHTML = ''; if (answeredList) answeredList.innerHTML = ''; return; }
+  if (answeredSection && answeredList){
+    answeredSection.hidden = !lists.answered.length;
+    if (answeredTitle){
+      var a = lists.answered.length;
+      answeredTitle.textContent = a + (a === 1 ? ' projeto respondido' : ' projetos respondidos') + ' após o último e-mail';
+    }
+    renderNoReplyGroups(answeredList, groupNoReplyByPm(lists.answered), false);
+  }
   if (titleEl){
     var n = lists.needsReply.length;
     titleEl.textContent = 'Sem resposta do PM — ' + n + (n === 1 ? ' projeto' : ' projetos');

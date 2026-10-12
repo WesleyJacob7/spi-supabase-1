@@ -253,7 +253,7 @@ details[open] > .reminder-alert-secondary-title::before{ content:"▾ "; }
 .reminder-alert-list.muted .reminder-alert-project{ font-weight:500; }
 /* card "Sem resposta do PM" — neutro (consulta), agrupado por PM */
 .noreply-card{ padding: 16px 20px 18px; border-color: var(--border); background: var(--surface-1); }
-#noReplyAlertGoodList{ margin-top:10px; }
+#noReplyAlertGoodList, #noReplyAlertAnsweredList{ margin-top:10px; }
 .noreply-card .reminder-alert-title{ color: var(--text-primary); }
 .noreply-group{ display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .noreply-group:last-child{ margin-bottom:0; }
@@ -674,10 +674,6 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       </summary>
       <div class="reminder-alert-list" id="reminderAlertList"></div>
     </details>
-    <details class="reminder-alert-secondary" id="reminderAlertGoodSection" hidden>
-      <summary class="reminder-alert-secondary-title" id="reminderAlertGoodTitle">Sem lembrete necessário (SPI bom no envio)</summary>
-      <div class="reminder-alert-list muted" id="reminderAlertGoodList"></div>
-    </details>
   </div>
 
   <div class="card reminder-alert-card noreply-card fade-in" id="noReplyAlertCard" hidden>
@@ -690,6 +686,10 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       <details class="reminder-alert-secondary" id="noReplyAlertGoodSection" hidden>
         <summary class="reminder-alert-secondary-title" id="noReplyAlertGoodTitle">Sem resposta, mas com SPI bom no envio</summary>
         <div class="reminder-alert-list muted" id="noReplyAlertGoodList"></div>
+      </details>
+      <details class="reminder-alert-secondary" id="noReplyAlertAnsweredSection" hidden>
+        <summary class="reminder-alert-secondary-title" id="noReplyAlertAnsweredTitle">Respondidos após o último e-mail</summary>
+        <div class="reminder-alert-list muted" id="noReplyAlertAnsweredList"></div>
       </details>
     </details>
   </div>
