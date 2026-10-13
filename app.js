@@ -1186,38 +1186,24 @@ async function renderSiteAccess(){
   var rows = r.data || [];
   card.hidden = false;
   var week = Date.now() - 7 * 86400000;
+  var uniq = function(L){ var o = {}; L.forEach(function(x){ o[x.visitor || x.created_at] = 1; }); return Object.keys(o).length; };
+  var add = function(box, text, sub){ var d = document.createElement('div'); d.textContent = text; if (sub){ var s2 = document.createElement('span'); s2.className = 'acc-sub'; s2.textContent = ' · ' + sub; d.appendChild(s2); } box.appendChild(d); };
   var sum = document.getElementById('accessSummary');
   sum.innerHTML = '';
   ['JKA', 'Prestige'].forEach(function(co){
     var all = rows.filter(function(x){ return x.company === co; });
     var w = all.filter(function(x){ return new Date(x.created_at).getTime() >= week; });
-    var uniq = function(L){ var o = {}; L.forEach(function(x){ o[x.visitor || x.created_at] = 1; }); return Object.keys(o).length; };
-    var line = document.createElement('div'); line.className = 'reminder-alert-item';
-    var info = document.createElement('div'); info.className = 'reminder-alert-info';
-    var name = document.createElement('span'); name.className = 'reminder-alert-project';
-    name.textContent = co + ' — ' + w.length + (w.length === 1 ? ' acesso' : ' acessos') + ' nos últimos 7 dias (' + uniq(w) + (uniq(w) === 1 ? ' navegador' : ' navegadores') + ')';
-    var sub = document.createElement('span'); sub.className = 'reminder-alert-days';
-    sub.textContent = all.length
-      ? 'Últimos 30 dias: ' + all.length + (all.length === 1 ? ' acesso' : ' acessos') + ' · último em ' + formatAccessDate(all[0].created_at)
-      : 'Nenhum acesso nos últimos 30 dias';
-    info.appendChild(name); info.appendChild(sub); line.appendChild(info); sum.appendChild(line);
+    add(sum, co + ': ' + w.length + ' na semana (' + uniq(w) + (uniq(w) === 1 ? ' navegador' : ' navegadores') + ')',
+      all.length ? all.length + ' em 30 dias · último ' + formatAccessDate(all[0].created_at) : 'nenhum em 30 dias');
   });
   var lastW = rows.filter(function(x){ return new Date(x.created_at).getTime() >= week; }).length;
-  document.getElementById('accessTitle').textContent = 'Acessos aos sites das empresas — ' + lastW + ' na semana';
+  document.getElementById('accessTitle').textContent = 'Acessos aos sites das empresas: ' + lastW + ' na semana';
   var list = document.getElementById('accessList');
   list.innerHTML = '';
   var last = rows.slice(0, 50);
   document.getElementById('accessListTitle').textContent = 'Últimos acessos (' + last.length + ')';
-  if (!last.length){ var e = document.createElement('div'); e.className = 'history-empty'; e.textContent = 'Nenhum acesso registrado ainda.'; list.appendChild(e); return; }
-  last.forEach(function(x){
-    var line = document.createElement('div'); line.className = 'reminder-alert-item';
-    var info = document.createElement('div'); info.className = 'reminder-alert-info';
-    var name = document.createElement('span'); name.className = 'reminder-alert-project';
-    name.textContent = x.company + ' — ' + formatAccessDate(x.created_at);
-    var sub = document.createElement('span'); sub.className = 'reminder-alert-days';
-    sub.textContent = x.device || 'aparelho não identificado';
-    info.appendChild(name); info.appendChild(sub); line.appendChild(info); list.appendChild(line);
-  });
+  if (!last.length){ add(list, 'Nenhum acesso registrado ainda.'); return; }
+  last.forEach(function(x){ add(list, x.company + ' — ' + formatAccessDate(x.created_at), x.device || ''); });
 }
 function formatAccessDate(iso){
   try {

@@ -252,6 +252,17 @@ details[open] > .reminder-alert-secondary-title::before{ content:"▾ "; }
 .reminder-alert-list.muted .reminder-alert-item{ opacity:.8; }
 .reminder-alert-list.muted .reminder-alert-project{ font-weight:500; }
 /* card "Sem resposta do PM" — neutro (consulta), agrupado por PM */
+/* acessos aos sites das empresas — discreto, no rodapé do painel admin */
+.access-mini{ margin: 22px 0 8px; font-size:12px; color: var(--text-muted); }
+.access-mini summary{ cursor:pointer; user-select:none; list-style:none; display:inline-block; }
+.access-mini summary::-webkit-details-marker{ display:none; }
+.access-mini summary::before{ content:"▸ "; }
+.access-mini[open] > summary::before, .access-mini details[open] > summary::before{ content:"▾ "; }
+.access-mini summary:hover{ color: var(--text-primary); }
+.access-mini #accessSummary{ margin: 8px 0 6px 14px; display:flex; flex-direction:column; gap:3px; }
+.access-mini #accessListSection{ margin-left:14px; }
+.access-mini #accessList{ margin: 6px 0 0 14px; display:flex; flex-direction:column; gap:2px; }
+.access-mini .acc-sub{ opacity:.75; }
 .noreply-card{ padding: 16px 20px 18px; border-color: var(--border); background: var(--surface-1); }
 #noReplyAlertGoodList, #noReplyAlertAnsweredList{ margin-top:10px; }
 .noreply-card .reminder-alert-title{ color: var(--text-primary); }
@@ -694,20 +705,6 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     </details>
   </div>
 
-  <div class="card reminder-alert-card noreply-card fade-in" id="accessCard" hidden>
-    <details class="reminder-alert-main" id="accessMainSection">
-      <summary class="reminder-alert-head">
-        <div class="reminder-alert-title" id="accessTitle">Acessos aos sites das empresas</div>
-        <p class="reminder-alert-sub" id="accessSub">Aberturas dos sites da JKA e da Prestige (anônimas: data, hora e aparelho).</p>
-      </summary>
-      <div class="reminder-alert-list" id="accessSummary"></div>
-      <details class="reminder-alert-secondary" id="accessListSection">
-        <summary class="reminder-alert-secondary-title" id="accessListTitle">Últimos acessos</summary>
-        <div class="reminder-alert-list muted" id="accessList"></div>
-      </details>
-    </details>
-  </div>
-
   <div class="filters fade-in d1">
     <div class="filter-group">
       <span class="filter-label">Semana</span>
@@ -827,6 +824,15 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       </table>
     </div>
   </div>
+
+  <details class="access-mini" id="accessCard" hidden>
+    <summary id="accessTitle">Acessos aos sites das empresas</summary>
+    <div id="accessSummary"></div>
+    <details id="accessListSection">
+      <summary id="accessListTitle">Últimos acessos</summary>
+      <div id="accessList"></div>
+    </details>
+  </details>
 
 </div>
 
