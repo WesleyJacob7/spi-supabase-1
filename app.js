@@ -1149,6 +1149,83 @@ function reminderAlertLists(){
   goodAtSend.sort(function(a, b){ return b.daysSince - a.daysSince; });
   return { needsReminder: needsReminder, goodAtSend: goodAtSend };
 }
+// ---- Acessos aos sites das empresas (registro anônimo) ----
+// Os sites JKA/Prestige gravam em site_access cada abertura (uma por sessão do
+// navegador, para não contar recarregamentos): empresa, aparelho/navegador e um
+// id aleatório do navegador (só para contar visitantes diferentes, sem
+// identificar a pessoa). O painel admin mostra o resumo e os últimos acessos.
+function describeDevice(){
+  var ua = navigator.userAgent || '';
+  var os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
+    : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'outro sistema';
+  var br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome'
+    : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'outro navegador';
+  return br + ' no ' + os;
+}
+async function logSiteAccess(){
+  if (!SPI_FORCED_VIEW || !supabaseClient) return;
+  try {
+    var key = 'spi_access_logged_' + SPI_FORCED_VIEW;
+    try { if (sessionStorage.getItem(key)) return; } catch (e){}
+    var vid = null;
+    try { vid = localStorage.getItem('spi_visitor'); } catch (e){}
+    if (!vid){
+      vid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      try { localStorage.setItem('spi_visitor', vid); } catch (e){}
+    }
+    var r = await supabaseClient.from('site_access').insert({ company: SPI_FORCED_VIEW, visitor: vid.slice(0, 64), device: describeDevice().slice(0, 80) });
+    if (!r.error){ try { sessionStorage.setItem(key, '1'); } catch (e){} }
+  } catch (e){ /* registro de acesso nunca atrapalha o site */ }
+}
+async function renderSiteAccess(){
+  var card = document.getElementById('accessCard');
+  if (!card || !supabaseClient) return;
+  var since = new Date(Date.now() - 30 * 86400000).toISOString();
+  var r = await supabaseClient.from('site_access').select('company,visitor,device,created_at').gte('created_at', since).order('created_at', { ascending: false }).limit(2000);
+  if (r.error){ return; }
+  var rows = r.data || [];
+  card.hidden = false;
+  var week = Date.now() - 7 * 86400000;
+  var sum = document.getElementById('accessSummary');
+  sum.innerHTML = '';
+  ['JKA', 'Prestige'].forEach(function(co){
+    var all = rows.filter(function(x){ return x.company === co; });
+    var w = all.filter(function(x){ return new Date(x.created_at).getTime() >= week; });
+    var uniq = function(L){ var o = {}; L.forEach(function(x){ o[x.visitor || x.created_at] = 1; }); return Object.keys(o).length; };
+    var line = document.createElement('div'); line.className = 'reminder-alert-item';
+    var info = document.createElement('div'); info.className = 'reminder-alert-info';
+    var name = document.createElement('span'); name.className = 'reminder-alert-project';
+    name.textContent = co + ' — ' + w.length + (w.length === 1 ? ' acesso' : ' acessos') + ' nos últimos 7 dias (' + uniq(w) + (uniq(w) === 1 ? ' navegador' : ' navegadores') + ')';
+    var sub = document.createElement('span'); sub.className = 'reminder-alert-days';
+    sub.textContent = all.length
+      ? 'Últimos 30 dias: ' + all.length + (all.length === 1 ? ' acesso' : ' acessos') + ' · último em ' + formatAccessDate(all[0].created_at)
+      : 'Nenhum acesso nos últimos 30 dias';
+    info.appendChild(name); info.appendChild(sub); line.appendChild(info); sum.appendChild(line);
+  });
+  var lastW = rows.filter(function(x){ return new Date(x.created_at).getTime() >= week; }).length;
+  document.getElementById('accessTitle').textContent = 'Acessos aos sites das empresas — ' + lastW + ' na semana';
+  var list = document.getElementById('accessList');
+  list.innerHTML = '';
+  var last = rows.slice(0, 50);
+  document.getElementById('accessListTitle').textContent = 'Últimos acessos (' + last.length + ')';
+  if (!last.length){ var e = document.createElement('div'); e.className = 'history-empty'; e.textContent = 'Nenhum acesso registrado ainda.'; list.appendChild(e); return; }
+  last.forEach(function(x){
+    var line = document.createElement('div'); line.className = 'reminder-alert-item';
+    var info = document.createElement('div'); info.className = 'reminder-alert-info';
+    var name = document.createElement('span'); name.className = 'reminder-alert-project';
+    name.textContent = x.company + ' — ' + formatAccessDate(x.created_at);
+    var sub = document.createElement('span'); sub.className = 'reminder-alert-days';
+    sub.textContent = x.device || 'aparelho não identificado';
+    info.appendChild(name); info.appendChild(sub); line.appendChild(info); list.appendChild(line);
+  });
+}
+function formatAccessDate(iso){
+  try {
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  } catch (e){ return iso || ''; }
+}
+
 function renderReminderAlertItems(container, items, showButton, emptyMessage){
   container.innerHTML = '';
   if (!items.length){
@@ -4121,6 +4198,9 @@ async function boot(){
   if (isAdminUser()){
     refreshPmEmailLogSummary().then(renderReminderAlert);
   }
+  // sites das empresas registram a abertura; o painel do Wesley Jacob mostra os acessos
+  if (SPI_FORCED_VIEW) logSiteAccess();
+  else if (isAdminUser()) renderSiteAccess();
   if (!supabaseClient && isAdminUser()){
     showToast('Supabase não configurado (config.js) — as alterações valem só para esta visualização.', 'warn');
   }
