@@ -3579,7 +3579,10 @@ function computeSpiEvolution(){
     var list = rowsForWeek(w);
     var spi = weightedSpi(list);
     if (spi === null) return;
-    out.push({ week: w, spi: spi, n: list.length });
+    // data de referência da semana = a data dos lançamentos (a mais frequente), igual ao histórico do projeto
+    var cnt = {}, ref = '';
+    list.forEach(function(d){ if (d.date){ cnt[d.date] = (cnt[d.date] || 0) + 1; if (!ref || cnt[d.date] > cnt[ref]) ref = d.date; } });
+    out.push({ week: w, ref: fmtDateMDY(ref || dateFromWeekLabel(w)), spi: spi, n: list.length });
   });
   out.forEach(function(r, i){
     var prev = i > 0 ? out[i - 1] : null;
@@ -3621,7 +3624,7 @@ function renderSpiEvolution(){
     if (r.week === state.week) tr.className = 'sel';
     var c = evoDeltaClass(r.delta);
     var arrow = c === 'good' ? '▲ ' : (c === 'crit' ? '▼ ' : '');
-    tr.innerHTML = '<td>' + escapeHtmlEvo(r.week) + '</td>'
+    tr.innerHTML = '<td title="Semana ' + escapeHtmlEvo(r.week) + '">' + escapeHtmlEvo(r.ref) + '</td>'
       + '<td class="num">' + r.n + '</td>'
       + '<td class="num"><span class="bd-val ' + statusOf(r.spi) + '">' + fmtSpi(r.spi) + '</span></td>'
       + '<td class="num"><span class="evo-delta ' + c + '">' + (r.delta === null ? '—' : arrow + fmtSignedSpi(r.delta)) + '</span></td>'
@@ -3657,7 +3660,7 @@ function renderSpiEvolution(){
   if (1 >= lo && 1 <= hi) s += '<line class="evo-ref" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yAt(1) + '" y2="' + yAt(1) + '"/><text x="' + (W - padR) + '" y="' + (yAt(1) - 4) + '" text-anchor="end">1,000</text>';
   s += '<polyline class="evo-line" points="' + data.map(function(r, i){ return xAt(i).toFixed(1) + ',' + yAt(r.spi).toFixed(1); }).join(' ') + '"/>';
   data.forEach(function(r, i){
-    s += '<circle class="evo-dot' + (r.week === state.week ? ' sel' : '') + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="' + (r.week === state.week ? 5.5 : 4) + '" fill="' + color[statusOf(r.spi)] + '"><title>Semana ' + escapeHtmlEvo(r.week) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)</title></circle>';
+    s += '<circle class="evo-dot' + (r.week === state.week ? ' sel' : '') + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="' + (r.week === state.week ? 5.5 : 4) + '" fill="' + color[statusOf(r.spi)] + '"><title>' + escapeHtmlEvo(r.ref) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)</title></circle>';
   });
   // painel 2
   s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top + h1 + gap - 10) + '">Variação vs. semana anterior</text>';
@@ -3669,13 +3672,15 @@ function renderSpiEvolution(){
     if (r.delta === null) return;
     var c = evoDeltaClass(r.delta), y = yD(r.delta);
     var yTop = Math.min(y, y0), hh = Math.max(Math.abs(y - y0), 1.5);
-    s += '<rect x="' + (xAt(i) - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + color[c] + '"' + (r.week === state.week ? '' : ' opacity="0.85"') + '><title>Semana ' + escapeHtmlEvo(r.week) + ': ' + fmtSignedSpi(r.delta) + ' (' + fmtSignedPct(r.pct) + ')</title></rect>';
+    s += '<rect x="' + (xAt(i) - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + color[c] + '"' + (r.week === state.week ? '' : ' opacity="0.85"') + '><title>' + escapeHtmlEvo(r.ref) + ': ' + fmtSignedSpi(r.delta) + ' (' + fmtSignedPct(r.pct) + ')</title></rect>';
   });
   // eixo x (semanas) — rótulos espaçados para não sobrepor
-  var every = Math.max(1, Math.ceil(n / 12));
+  var every = Math.max(1, Math.ceil(n / 9));
   data.forEach(function(r, i){
-    if (i % every && i !== n - 1) return;
-    s += '<text x="' + xAt(i).toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="middle">' + escapeHtmlEvo(r.week) + '</text>';
+    if (i !== n - 1 && (i % every || n - 1 - i < every)) return;
+    var anc = n > 1 && i === 0 ? 'start' : (n > 1 && i === n - 1 ? 'end' : 'middle');
+    var xx = anc === 'start' ? xAt(i) - 4 : (anc === 'end' ? xAt(i) + 4 : xAt(i));
+    s += '<text x="' + xx.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(r.ref) + '</text>';
   });
   s += '</svg>';
   box.innerHTML = s;
