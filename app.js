@@ -3572,6 +3572,53 @@ function renderCompanyBreakdown(rows){
   });
 }
 
+/* ---------- cálculo do SPI global da semana selecionada (só no index.html, visão admin) ---------- */
+function fmtDays(v){ return (Math.round(v * 10) / 10).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+function renderSpiCalc(){
+  var card = document.getElementById('spiCalcCard');
+  if (!card) return;
+  var kp = document.getElementById('spiCalcKpis'), fm = document.getElementById('spiCalcFormula'), body = document.getElementById('spiCalcBody');
+  var title = document.getElementById('spiCalcTitle'), sum = document.getElementById('spiCalcDetailsTitle');
+  var rows = state.week ? rowsForWeek(state.week) : [];
+  var refCnt = {}, ref = '';
+  rows.forEach(function(d){ if (d.date){ refCnt[d.date] = (refCnt[d.date] || 0) + 1; if (!ref || refCnt[d.date] > refCnt[ref]) ref = d.date; } });
+  var refTxt = state.week ? fmtDateMDY(ref || dateFromWeekLabel(state.week)) : '—';
+  if (title) title.textContent = 'Cálculo do SPI Global — data de referência ' + refTxt;
+  var base = 0, sched = 0;
+  rows.forEach(function(d){ base += Number(d.baseline_duration) || 0; sched += Number(d.schedule_duration) || 0; });
+  var vari = sched - base;
+  var spi = sched > 0 ? base / sched : null;
+  var prevW = state.week ? previousWeekOf(state.week) : null;
+  var prevSpi = prevW ? weightedSpi(rowsForWeek(prevW)) : null;
+  var delta = (spi !== null && prevSpi !== null) ? spi - prevSpi : null;
+  var started = rows.filter(function(d){ return typeof d.spi === 'number' && d.pct_complete > 0; });
+  var simple = started.length ? started.reduce(function(a, d){ return a + d.spi; }, 0) / started.length : null;
+  var kpi = function(label, value, sub, cls){ return '<div class="spi-calc-kpi"><div class="spi-calc-kpi-label">' + label + '</div><div class="spi-calc-kpi-value' + (cls ? ' ' + cls : '') + '">' + value + '</div><div class="spi-calc-kpi-sub">' + (sub || '&nbsp;') + '</div></div>'; };
+  if (!rows.length || spi === null){
+    kp.innerHTML = ''; fm.textContent = 'Nenhum lançamento na seleção atual para esta semana.'; body.innerHTML = ''; if (sum) sum.textContent = 'Ver a conta por projeto';
+    return;
+  }
+  kp.innerHTML = kpi('&Sigma; Duração base', fmtDays(base) + ' d', rows.length + ' projeto(s)')
+    + kpi('&Sigma; Variação de término', (vari > 0 ? '+' : '') + fmtDays(vari) + ' d', vari > 0 ? 'atraso somado' : (vari < 0 ? 'adiantamento somado' : 'sem variação'))
+    + kpi('&Sigma; Duração programada', fmtDays(sched) + ' d', 'base + variação')
+    + kpi('SPI Global', fmtSpi(spi), (delta === null ? 'sem semana anterior' : (fmtSignedSpi(delta) + ' vs. semana anterior (' + fmtSignedPct(pctChange(delta, prevSpi)) + ')')), statusOf(spi));
+  fm.innerHTML = 'SPI Global = ' + fmtDays(base) + ' &divide; ' + fmtDays(sched) + ' = <b>' + fmtSpi(spi) + '</b>'
+    + (simple !== null ? ' &nbsp;&middot;&nbsp; média simples dos SPIs (só referência): ' + fmtSpi(simple) : '');
+  // conta por projeto, maior peso primeiro (peso = participação na Σ duração programada)
+  var list = rows.slice().sort(function(a, b){ return (Number(b.schedule_duration) || 0) - (Number(a.schedule_duration) || 0); });
+  body.innerHTML = list.map(function(d){
+    var b = Number(d.baseline_duration) || 0, sc = Number(d.schedule_duration) || 0, v = sc - b;
+    var sp = sc > 0 ? b / sc : null;
+    return '<tr><td>' + escapeHtmlEvo(projectLabel(d)) + (d.scope ? ' <span style="color:var(--text-muted)">· ' + escapeHtmlEvo(d.scope) + '</span>' : '') + '</td>'
+      + '<td>' + escapeHtmlEvo(d.company) + '</td>'
+      + '<td class="num">' + fmtDays(b) + '</td>'
+      + '<td class="num">' + (v > 0 ? '+' : '') + fmtDays(v) + '</td>'
+      + '<td class="num">' + fmtDays(sc) + '</td>'
+      + '<td class="num">' + (sp === null ? '—' : '<span class="bd-val ' + statusOf(sp) + '">' + fmtSpi(sp) + '</span>') + '</td>'
+      + '<td class="num">' + (sched > 0 ? (sc / sched * 100).toFixed(1).replace('.', ',') + '%' : '—') + '</td></tr>';
+  }).join('') + '<tr class="spi-calc-total"><td colspan="2"><b>Total</b></td><td class="num"><b>' + fmtDays(base) + '</b></td><td class="num"><b>' + (vari > 0 ? '+' : '') + fmtDays(vari) + '</b></td><td class="num"><b>' + fmtDays(sched) + '</b></td><td class="num"><b><span class="bd-val ' + statusOf(spi) + '">' + fmtSpi(spi) + '</span></b></td><td class="num"><b>100%</b></td></tr>';
+  if (sum) sum.textContent = 'Ver a conta por projeto (' + rows.length + ')';
+}
 /* ---------- evolução do SPI global por semana (só existe no index.html, visão admin) ---------- */
 function computeSpiEvolution(){
   var out = [];
@@ -3776,6 +3823,7 @@ function render(){
 
   renderBandBreakdown(rows);
   renderCompanyBreakdown(rows);
+  renderSpiCalc();
   renderSpiEvolution();
 
   var chartRows = state.isolatedProject

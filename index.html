@@ -433,8 +433,24 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .bd-val.crit{ color: var(--status-critical); }
 .bd-empty{ text-align:center; color: var(--text-muted); padding: 16px 4px; }
 
+/* cálculo do SPI global da semana (admin) */
+.spi-calc-card{ margin-top: 22px; margin-bottom: 22px; }
+.spi-calc-kpis{ display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:12px; margin: 12px 0 10px; }
+.spi-calc-kpi{ background: var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+.spi-calc-kpi-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color: var(--text-muted); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:600; }
+.spi-calc-kpi-value{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:19px; margin-top:2px; }
+.spi-calc-kpi-sub{ font-size:11.5px; color: var(--text-muted); margin-top:2px; }
+.spi-calc-kpi-value.good{ color: var(--status-good); } .spi-calc-kpi-value.warn{ color: var(--status-warning-text); } .spi-calc-kpi-value.crit{ color: var(--status-critical); }
+.spi-calc-formula{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:13px; color: var(--text-secondary); background: var(--surface-2); border-radius:8px; padding:9px 12px; margin-bottom:10px; overflow-x:auto; white-space:nowrap; }
+.spi-calc-formula b{ color: var(--text-primary); }
+.spi-calc-details summary{ cursor:pointer; font-size:13px; font-weight:600; color: var(--accent); padding:4px 0 8px; }
+.spi-calc-table-wrap{ max-height: 380px; overflow:auto; }
+.spi-calc-table td, .spi-calc-table th{ white-space:nowrap; }
+.spi-calc-table tfoot td{ font-weight:700; border-top:1px solid var(--border); padding: 8px 4px; }
+@media (max-width: 760px){ .spi-calc-kpis{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
 /* evolução do SPI global (admin) */
-.spi-evo-card{ margin-top: 22px; margin-bottom: 22px; }
+.spi-evo-card{ margin-bottom: 22px; }
 .spi-evo-chart{ width:100%; margin: 8px 0 6px; }
 .spi-evo-chart svg{ width:100%; height:auto; display:block; overflow:visible; }
 .spi-evo-chart text{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; fill: var(--text-muted); }
@@ -843,6 +859,26 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
         <tbody id="tableBody"></tbody>
       </table>
     </div>
+  </div>
+
+  <div class="card fade-in d3 spi-calc-card" id="spiCalcCard">
+    <div class="card-head">
+      <div>
+        <div class="card-title" id="spiCalcTitle">Cálculo do SPI Global</div>
+        <div class="card-note">SPI Global = &Sigma; duração base &divide; &Sigma; duração programada (programada = base + variação de término) &middot; mesma seleção do gráfico abaixo</div>
+      </div>
+    </div>
+    <div class="spi-calc-kpis" id="spiCalcKpis"></div>
+    <div class="spi-calc-formula" id="spiCalcFormula"></div>
+    <details class="spi-calc-details">
+      <summary id="spiCalcDetailsTitle">Ver a conta por projeto</summary>
+      <div class="spi-calc-table-wrap">
+        <table class="mini-table spi-calc-table">
+          <thead><tr><th>Projeto</th><th>Empresa</th><th class="num">Base (d)</th><th class="num">Variação (d)</th><th class="num">Programada (d)</th><th class="num">SPI</th><th class="num">Peso</th></tr></thead>
+          <tbody id="spiCalcBody"></tbody>
+        </table>
+      </div>
+    </details>
   </div>
 
   <div class="card fade-in d3 spi-evo-card" id="spiEvolutionCard">
