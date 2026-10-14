@@ -433,17 +433,8 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .bd-val.crit{ color: var(--status-critical); }
 .bd-empty{ text-align:center; color: var(--text-muted); padding: 16px 4px; }
 
-/* SPI global da semana de referência (admin) */
-.spi-calc-card{ margin-top: 22px; margin-bottom: 22px; padding-bottom: 18px; }
-.spi-calc-row{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-.spi-calc-formula{ font-size:13px; color: var(--text-secondary); margin-top:4px; }
-.spi-calc-main{ text-align:right; }
-.spi-calc-value{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-weight:700; font-size:30px; line-height:1.1; }
-.spi-calc-value.good{ color: var(--status-good); } .spi-calc-value.warn{ color: var(--status-warning-text); } .spi-calc-value.crit{ color: var(--status-critical); }
-.spi-calc-delta{ font-size:12.5px; margin-top:2px; }
-
 /* evolução do SPI global (admin) */
-.spi-evo-card{ margin-bottom: 22px; }
+.spi-evo-card{ margin-top: 22px; margin-bottom: 22px; }
 .spi-evo-chart{ width:100%; margin: 8px 0 6px; }
 .spi-evo-chart svg{ width:100%; height:auto; display:block; overflow:visible; }
 .spi-evo-chart text{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; fill: var(--text-muted); }
@@ -854,18 +845,6 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     </div>
   </div>
 
-  <div class="card fade-in d3 spi-calc-card" id="spiCalcCard">
-    <div class="spi-calc-row">
-      <div>
-        <div class="card-title" id="spiCalcTitle">SPI Global da semana</div>
-        <div class="spi-calc-formula" id="spiCalcFormula"></div>
-      </div>
-      <div class="spi-calc-main">
-        <div class="spi-calc-value" id="spiCalcValue">—</div>
-        <div class="spi-calc-delta" id="spiCalcDelta"></div>
-      </div>
-    </div>
-  </div>
 
   <div class="card fade-in d3 spi-evo-card" id="spiEvolutionCard">
     <div class="card-head">

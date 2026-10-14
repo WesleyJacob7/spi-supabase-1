@@ -3572,29 +3572,6 @@ function renderCompanyBreakdown(rows){
   });
 }
 
-/* ---------- SPI global da semana de referência selecionada (só no index.html, visão admin) ---------- */
-function fmtDays(v){ return (Math.round(v * 10) / 10).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
-function renderSpiCalc(){
-  var card = document.getElementById('spiCalcCard');
-  if (!card) return;
-  var title = document.getElementById('spiCalcTitle'), fm = document.getElementById('spiCalcFormula');
-  var val = document.getElementById('spiCalcValue'), dl = document.getElementById('spiCalcDelta');
-  var rows = state.week ? rowsForWeek(state.week) : [];
-  var cnt = {}, ref = '';
-  rows.forEach(function(d){ if (d.date){ cnt[d.date] = (cnt[d.date] || 0) + 1; if (!ref || cnt[d.date] > cnt[ref]) ref = d.date; } });
-  title.textContent = 'SPI Global — data de referência ' + (state.week ? fmtDateMDY(ref || dateFromWeekLabel(state.week)) : '—');
-  var base = 0, sched = 0;
-  rows.forEach(function(d){ base += Number(d.baseline_duration) || 0; sched += Number(d.schedule_duration) || 0; });
-  var spi = sched > 0 ? base / sched : null;
-  val.className = 'spi-calc-value';
-  if (spi === null){ val.textContent = '—'; fm.textContent = 'Nenhum lançamento na seleção atual para esta semana.'; dl.textContent = ''; return; }
-  val.textContent = fmtSpi(spi); val.classList.add(statusOf(spi));
-  fm.innerHTML = 'Σ duração base ' + fmtDays(base) + ' d ÷ Σ duração programada ' + fmtDays(sched) + ' d · ' + rows.length + ' projeto(s)';
-  var prevW = previousWeekOf(state.week), prevSpi = prevW ? weightedSpi(rowsForWeek(prevW)) : null;
-  if (prevSpi === null){ dl.innerHTML = '<span class="evo-delta flat">sem semana anterior</span>'; return; }
-  var d = spi - prevSpi, c = evoDeltaClass(d);
-  dl.innerHTML = '<span class="evo-delta ' + c + '">' + (c === 'good' ? '▲ ' : c === 'crit' ? '▼ ' : '') + fmtSignedSpi(d) + ' (' + fmtSignedPct(pctChange(d, prevSpi)) + ')</span> <span class="evo-delta flat">vs. semana anterior</span>';
-}
 /* ---------- evolução do SPI global por semana (só existe no index.html, visão admin) ---------- */
 function computeSpiEvolution(){
   var out = [];
@@ -3799,7 +3776,6 @@ function render(){
 
   renderBandBreakdown(rows);
   renderCompanyBreakdown(rows);
-  renderSpiCalc();
   renderSpiEvolution();
 
   var chartRows = state.isolatedProject
