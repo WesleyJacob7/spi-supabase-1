@@ -3572,6 +3572,116 @@ function renderCompanyBreakdown(rows){
   });
 }
 
+/* ---------- evolução do SPI global por semana (só existe no index.html, visão admin) ---------- */
+function computeSpiEvolution(){
+  var out = [];
+  weeks.forEach(function(w){
+    var list = rowsForWeek(w);
+    var spi = weightedSpi(list);
+    if (spi === null) return;
+    out.push({ week: w, spi: spi, n: list.length });
+  });
+  out.forEach(function(r, i){
+    var prev = i > 0 ? out[i - 1] : null;
+    r.delta = prev ? r.spi - prev.spi : null;
+    r.pct = prev ? pctChange(r.delta, prev.spi) : null;
+  });
+  return out;
+}
+function evoDeltaClass(d){
+  if (d === null || d === undefined) return 'flat';
+  return d > SPI_EPSILON ? 'good' : (d < -SPI_EPSILON ? 'crit' : 'flat');
+}
+function fmtSignedSpi(d){
+  if (d === null || d === undefined) return '—';
+  if (Math.abs(d) <= SPI_EPSILON) return '0,000';
+  return (d > 0 ? '+' : '−') + fmtSpi(Math.abs(d));
+}
+function fmtSignedPct(p){
+  if (p === null || p === undefined) return '—';
+  if (Math.abs(p) < 0.05) return '0,0%';
+  return (p > 0 ? '+' : '−') + Math.abs(p).toFixed(1).replace('.', ',') + '%';
+}
+function renderSpiEvolution(){
+  var card = document.getElementById('spiEvolutionCard');
+  var body = document.getElementById('spiEvolutionBody');
+  var box = document.getElementById('spiEvolutionChart');
+  if (!card || !body || !box) return;
+  var data = computeSpiEvolution();
+
+  // tabela (semana mais recente primeiro)
+  body.innerHTML = '';
+  if (!data.length){
+    body.innerHTML = '<tr><td colspan="5" class="bd-empty">Nenhum dado para a seleção atual.</td></tr>';
+    box.innerHTML = '';
+    return;
+  }
+  data.slice().reverse().forEach(function(r){
+    var tr = document.createElement('tr');
+    if (r.week === state.week) tr.className = 'sel';
+    var c = evoDeltaClass(r.delta);
+    var arrow = c === 'good' ? '▲ ' : (c === 'crit' ? '▼ ' : '');
+    tr.innerHTML = '<td>' + escapeHtmlEvo(r.week) + '</td>'
+      + '<td class="num">' + r.n + '</td>'
+      + '<td class="num"><span class="bd-val ' + statusOf(r.spi) + '">' + fmtSpi(r.spi) + '</span></td>'
+      + '<td class="num"><span class="evo-delta ' + c + '">' + (r.delta === null ? '—' : arrow + fmtSignedSpi(r.delta)) + '</span></td>'
+      + '<td class="num"><span class="evo-delta ' + c + '">' + fmtSignedPct(r.pct) + '</span></td>';
+    body.appendChild(tr);
+  });
+
+  // gráfico: linha do SPI global (em cima) + barras da variação semana a semana (embaixo)
+  var W = 760, padL = 48, padR = 16, top = 22, h1 = 170, gap = 34, h2 = 90, bottom = 34;
+  var H = top + h1 + gap + h2 + bottom;
+  var n = data.length;
+  var step = n > 1 ? (W - padL - padR) / (n - 1) : 0;
+  var xAt = function(i){ return n > 1 ? padL + i * step : padL + (W - padL - padR) / 2; };
+  var vals = data.map(function(r){ return r.spi; });
+  var lo = Math.min.apply(null, vals.concat([1])), hi = Math.max.apply(null, vals.concat([1]));
+  var pad = Math.max((hi - lo) * 0.15, 0.01); lo -= pad; hi += pad;
+  var yAt = function(v){ return top + (hi - v) / (hi - lo) * h1; };
+  var deltas = data.map(function(r){ return r.delta || 0; });
+  var dmax = Math.max.apply(null, deltas.map(Math.abs).concat([0.001]));
+  var y0 = top + h1 + gap + h2 / 2;
+  var yD = function(d){ return y0 - d / dmax * (h2 / 2 - 4); };
+  var bw = Math.max(4, Math.min(28, (n > 1 ? step : 60) * 0.55));
+  var color = { good: 'var(--status-good)', warn: 'var(--status-warning-text)', crit: 'var(--status-critical)', flat: 'var(--text-muted)' };
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Evolução do SPI global por semana">';
+  // painel 1
+  s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top - 8) + '">SPI Global</text>';
+  var ticks = 4;
+  for (var t = 0; t <= ticks; t++){
+    var v = lo + (hi - lo) * t / ticks, y = yAt(v);
+    s += '<line class="evo-axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y + '" y2="' + y + '"/>'
+      + '<text x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + fmtSpi(v) + '</text>';
+  }
+  if (1 >= lo && 1 <= hi) s += '<line class="evo-ref" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yAt(1) + '" y2="' + yAt(1) + '"/><text x="' + (W - padR) + '" y="' + (yAt(1) - 4) + '" text-anchor="end">1,000</text>';
+  s += '<polyline class="evo-line" points="' + data.map(function(r, i){ return xAt(i).toFixed(1) + ',' + yAt(r.spi).toFixed(1); }).join(' ') + '"/>';
+  data.forEach(function(r, i){
+    s += '<circle class="evo-dot' + (r.week === state.week ? ' sel' : '') + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="' + (r.week === state.week ? 5.5 : 4) + '" fill="' + color[statusOf(r.spi)] + '"><title>Semana ' + escapeHtmlEvo(r.week) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)</title></circle>';
+  });
+  // painel 2
+  s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top + h1 + gap - 10) + '">Variação vs. semana anterior</text>';
+  s += '<line class="evo-axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y0 + '" y2="' + y0 + '"/>';
+  s += '<text x="' + (padL - 6) + '" y="' + (yD(dmax) + 4) + '" text-anchor="end">+' + fmtSpi(dmax) + '</text>'
+    + '<text x="' + (padL - 6) + '" y="' + (y0 + 4) + '" text-anchor="end">0</text>'
+    + '<text x="' + (padL - 6) + '" y="' + (yD(-dmax) + 4) + '" text-anchor="end">−' + fmtSpi(dmax) + '</text>';
+  data.forEach(function(r, i){
+    if (r.delta === null) return;
+    var c = evoDeltaClass(r.delta), y = yD(r.delta);
+    var yTop = Math.min(y, y0), hh = Math.max(Math.abs(y - y0), 1.5);
+    s += '<rect x="' + (xAt(i) - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + color[c] + '"' + (r.week === state.week ? '' : ' opacity="0.85"') + '><title>Semana ' + escapeHtmlEvo(r.week) + ': ' + fmtSignedSpi(r.delta) + ' (' + fmtSignedPct(r.pct) + ')</title></rect>';
+  });
+  // eixo x (semanas) — rótulos espaçados para não sobrepor
+  var every = Math.max(1, Math.ceil(n / 12));
+  data.forEach(function(r, i){
+    if (i % every && i !== n - 1) return;
+    s += '<text x="' + xAt(i).toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="middle">' + escapeHtmlEvo(r.week) + '</text>';
+  });
+  s += '</svg>';
+  box.innerHTML = s;
+}
+function escapeHtmlEvo(v){ return String(v === null || v === undefined ? '' : v).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
 /* ---------- main render ---------- */
 function render(){
   var rows = currentRows();
@@ -3640,6 +3750,7 @@ function render(){
 
   renderBandBreakdown(rows);
   renderCompanyBreakdown(rows);
+  renderSpiEvolution();
 
   var chartRows = state.isolatedProject
     ? rows.filter(function(d){ return d.project === state.isolatedProject; })
