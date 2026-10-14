@@ -434,7 +434,7 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .bd-empty{ text-align:center; color: var(--text-muted); padding: 16px 4px; }
 
 /* evolução do SPI global (admin) */
-.spi-evo-card{ margin-bottom: 22px; }
+.spi-evo-card{ margin-top: 22px; margin-bottom: 22px; }
 .spi-evo-chart{ width:100%; margin: 8px 0 6px; }
 .spi-evo-chart svg{ width:100%; height:auto; display:block; overflow:visible; }
 .spi-evo-chart text{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; fill: var(--text-muted); }
@@ -811,22 +811,6 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     </div>
   </div>
 
-  <div class="card fade-in d2 spi-evo-card" id="spiEvolutionCard">
-    <div class="card-head">
-      <div>
-        <div class="card-title">Evolução do SPI Global &mdash; por semana</div>
-        <div class="card-note">ponderado por duração &middot; respeita os filtros de empresa/escopo e os projetos excluídos/encerrados &middot; só na visão admin</div>
-      </div>
-    </div>
-    <div class="spi-evo-chart" id="spiEvolutionChart"></div>
-    <div class="spi-evo-table-wrap">
-      <table class="mini-table spi-evo-table">
-        <thead><tr><th>Semana</th><th class="num">Projetos</th><th class="num">SPI Global</th><th class="num">Variação</th><th class="num">Var. %</th></tr></thead>
-        <tbody id="spiEvolutionBody"></tbody>
-      </table>
-    </div>
-  </div>
-
   <div class="table-card fade-in d3">
     <div class="table-head">
       <div>
@@ -854,6 +838,22 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card fade-in d3 spi-evo-card" id="spiEvolutionCard">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Evolução do SPI Global &mdash; por semana</div>
+        <div class="card-note">ponderado por duração &middot; respeita os filtros de empresa/escopo e os projetos excluídos/encerrados &middot; só na visão admin</div>
+      </div>
+    </div>
+    <div class="spi-evo-chart" id="spiEvolutionChart"></div>
+    <div class="spi-evo-table-wrap">
+      <table class="mini-table spi-evo-table">
+        <thead><tr><th>Semana</th><th class="num">Projetos</th><th class="num">SPI Global</th><th class="num">Variação</th><th class="num">Var. %</th></tr></thead>
+        <tbody id="spiEvolutionBody"></tbody>
       </table>
     </div>
   </div>
