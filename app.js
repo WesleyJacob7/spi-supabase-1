@@ -3658,9 +3658,14 @@ function renderSpiEvolution(){
       + '<text x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + fmtSpi(v) + '</text>';
   }
   if (1 >= lo && 1 <= hi) s += '<line class="evo-ref" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yAt(1) + '" y2="' + yAt(1) + '"/><text x="' + (W - padR) + '" y="' + (yAt(1) - 4) + '" text-anchor="end">1,000</text>';
-  s += '<polyline class="evo-line" points="' + data.map(function(r, i){ return xAt(i).toFixed(1) + ',' + yAt(r.spi).toFixed(1); }).join(' ') + '"/>';
+  // linha suavizada (curva monotônica, não "passa" dos pontos) + área clara abaixo
+  var pts = data.map(function(r, i){ return [xAt(i), yAt(r.spi)]; });
+  var path = evoSmoothPath(pts);
+  if (pts.length > 1) s += '<path class="evo-area" d="' + path + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + (top + h1) + ' L' + pts[0][0].toFixed(1) + ',' + (top + h1) + ' Z"/>';
+  s += '<path class="evo-line" d="' + path + '"/>';
   data.forEach(function(r, i){
-    s += '<circle class="evo-dot' + (r.week === state.week ? ' sel' : '') + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="' + (r.week === state.week ? 5.5 : 4) + '" fill="' + color[statusOf(r.spi)] + '"><title>' + escapeHtmlEvo(r.ref) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)</title></circle>';
+    if (r.week === state.week) s += '<circle class="evo-sel-ring" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="7"/>';
+    s += '<circle class="evo-dot' + (r.week === state.week ? ' sel' : '') + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="' + (r.week === state.week ? 3.5 : 3) + '" fill="' + color[statusOf(r.spi)] + '"><title>' + escapeHtmlEvo(r.ref) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)</title></circle>';
   });
   // painel 2
   s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top + h1 + gap - 10) + '">Variação vs. semana anterior</text>';
@@ -3684,6 +3689,22 @@ function renderSpiEvolution(){
   });
   s += '</svg>';
   box.innerHTML = s;
+}
+function evoSmoothPath(p){
+  if (!p.length) return '';
+  var f = function(v){ return v.toFixed(1); };
+  if (p.length < 3) return 'M' + p.map(function(q){ return f(q[0]) + ',' + f(q[1]); }).join(' L');
+  // Fritsch–Carlson (monotone cubic)
+  var n = p.length, dx = [], m = [], t = [];
+  for (var i = 0; i < n - 1; i++){ dx[i] = p[i + 1][0] - p[i][0]; m[i] = (p[i + 1][1] - p[i][1]) / dx[i]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (i = 1; i < n - 1; i++) t[i] = (m[i - 1] * m[i] <= 0) ? 0 : 3 * (dx[i - 1] + dx[i]) / ((2 * dx[i] + dx[i - 1]) / m[i - 1] + (dx[i] + 2 * dx[i - 1]) / m[i]);
+  var d = 'M' + f(p[0][0]) + ',' + f(p[0][1]);
+  for (i = 0; i < n - 1; i++){
+    var h = dx[i] / 3;
+    d += ' C' + f(p[i][0] + h) + ',' + f(p[i][1] + t[i] * h) + ' ' + f(p[i + 1][0] - h) + ',' + f(p[i + 1][1] - t[i + 1] * h) + ' ' + f(p[i + 1][0]) + ',' + f(p[i + 1][1]);
+  }
+  return d;
 }
 function escapeHtmlEvo(v){ return String(v === null || v === undefined ? '' : v).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 

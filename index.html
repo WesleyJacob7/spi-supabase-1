@@ -440,9 +440,12 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .spi-evo-chart text{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; fill: var(--text-muted); }
 .spi-evo-chart .evo-axis{ stroke: var(--hairline); stroke-width:1; }
 .spi-evo-chart .evo-ref{ stroke: var(--text-muted); stroke-width:1; stroke-dasharray: 4 4; opacity:.7; }
-.spi-evo-chart .evo-line{ fill:none; stroke: var(--accent); stroke-width:2.2; stroke-linejoin:round; stroke-linecap:round; }
-.spi-evo-chart .evo-dot{ stroke: var(--surface-1); stroke-width:1.5; }
-.spi-evo-chart .evo-dot.sel{ stroke: var(--text-primary); stroke-width:2.5; }
+.spi-evo-chart .evo-line{ fill:none; stroke: var(--accent); stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; }
+.spi-evo-chart .evo-area{ fill: var(--accent); opacity:.08; stroke:none; }
+.spi-evo-chart .evo-dot{ stroke: var(--surface-1); stroke-width:1; transition: r .12s ease; cursor: default; }
+.spi-evo-chart .evo-dot:hover{ r: 4.5; }
+.spi-evo-chart .evo-dot.sel{ stroke: var(--accent); stroke-width:1.5; }
+.spi-evo-chart .evo-sel-ring{ fill:none; stroke: var(--accent); stroke-width:1; opacity:.35; }
 .spi-evo-chart .evo-panel-label{ font-weight:600; fill: var(--text-secondary); }
 .spi-evo-table-wrap{ max-height: 320px; overflow-y:auto; }
 .spi-evo-table tr.sel td{ background: var(--surface-2); font-weight:600; }
