@@ -1352,12 +1352,14 @@ function noReplyAlertLists(){
     if (!s || !s.lastEmailSent) return;
     var sentDate = new Date(s.lastEmailSent);
     if (isNaN(sentDate.getTime())) return;
+    // E-mail mensal vencido: o projeto já está no card "E-mail original
+    // pendente" (a ação é reenviar o original) — fica só lá, tenha resposta
+    // do PM ou não, para não aparecer em dois cards ao mesmo tempo.
+    if (projectEmailDueInfo(row.project).status !== 'ok') return;
     var lastReply = s.lastReply ? new Date(s.lastReply) : null;
     if (lastReply && lastReply >= sentDate){
-      // já respondeu depois do último envio — vai para a sublista "Respondidos",
-      // exceto se o e-mail mensal já venceu (aí ele está no card "E-mail original
-      // pendente" e não deve aparecer duas vezes).
-      if (projectEmailDueInfo(row.project).status === 'ok'){
+      // já respondeu depois do último envio — vai para a sublista "Respondidos".
+      {
         answered.push({
           row: row,
           sentIso: isoDateOnly(sentDate),
