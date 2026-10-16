@@ -361,6 +361,13 @@ function buildEmailSubject(d){
 }
 
 function buildEmailQuestions(d){
+  // Projeto que já tem resposta do PM registrada no histórico (pm_email_log):
+  // no lugar das perguntas do primeiro e-mail, uma pergunta só, pedindo
+  // ações/atualizações novas — para o PM não repetir a resposta anterior.
+  var hist = pmEmailLogSummary[d.project];
+  if (hist && hist.lastReply){
+    return ['1. Temos mais alguma ação/atualização no projeto para recuperação do schedule?'];
+  }
   var qs = [];
   if (d.pct_complete <= 0.90){
     qs.push('Quais ações podem ser realizadas para recuperar esse indicador?');
@@ -407,7 +414,10 @@ function buildEmailBody(d){
     );
     paras.push('Diante desse cenário, solicitamos retorno sobre os pontos abaixo:');
     paras.push(buildEmailQuestions(d).join('\n'));
-    paras.push('Pedimos retorno o quanto antes para que possamos alinhar, em conjunto, um plano de recuperação de schedule para este projeto.');
+    var jaRespondeu = pmEmailLogSummary[d.project] && pmEmailLogSummary[d.project].lastReply;
+    paras.push(jaRespondeu
+      ? 'Pedimos retorno o quanto antes para que possamos alinhar, em conjunto, os próximos passos para este projeto.'
+      : 'Pedimos retorno o quanto antes para que possamos alinhar, em conjunto, um plano de recuperação de schedule para este projeto.');
   } else if (st === 'warn' && !isExactlyOne){
     paras.push(
       'Na atualização de ' + dataStr + ', o projeto está com ' + pctStr + ' de execução física e SPI de ' + spiStr +
