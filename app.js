@@ -353,11 +353,23 @@ function emailFmtDate(iso){
 }
 function emailFmtDias(v){ return Math.round(Math.abs(v || 0)); }
 
+// Assunto fixo por projeto, sem a faixa do SPI: os e-mails mensais e os
+// lembretes vão como resposta na mesma thread, e o SPI muda de faixa ao
+// longo da vida do projeto — um status no assunto ficaria desatualizado.
 function buildEmailSubject(d){
-  var st = statusOf(d.spi);
-  var tag = st === 'crit' ? 'Crítico' : st === 'warn' ? 'Atenção' : 'Bom';
-  var tail = st === 'crit' ? ' — Ação necessária' : st === 'warn' ? ' — Acompanhamento de schedule' : '';
-  return d.id + ' — ' + d.project + ' | ' + d.scope + tail + ' - SPI ' + tag;
+  return d.id + ' — ' + emailProjectName(d) + ' | ' + d.scope + ' — Acompanhamento de SPI';
+}
+// Nome do projeto para o texto dos e-mails: tira o sufixo " - <escopo>" quando
+// ele repete o escopo que já vem depois do "|" (ex.: "Eagle Hill - Siding |
+// Siding" vira "Eagle Hill | Siding"). No painel o nome continua completo,
+// porque é ele que diferencia o projeto de siding do de framing.
+function emailProjectName(d){
+  var name = String(d.project || '');
+  var scope = String(d.scope || '').trim();
+  if (!scope) return name;
+  var re = new RegExp('\\s*[-–—]\\s*' + scope.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i');
+  var stripped = name.replace(re, '');
+  return stripped || name;
 }
 
 function buildEmailQuestions(d){
@@ -388,7 +400,7 @@ function buildEmailBody(d){
   paras.push(pmName ? ('Prezado(a) ' + pmName + ',') : 'Prezado(a) Gerente de Contrato,');
   paras.push(
     'Este e-mail tem como objetivo informar a situação atual do indicador de SPI (Schedule Performance Index) do projeto ' +
-    d.id + ' — ' + d.project + ' | ' + d.scope + ', sob execução da ' + d.company + '.'
+    d.id + ' — ' + emailProjectName(d) + ' | ' + d.scope + ', sob execução da ' + d.company + '.'
   );
   paras.push(
     'O SPI (Schedule Performance Index) é o indicador que mede a eficiência do uso do tempo no projeto, comparando a ' +
@@ -468,7 +480,7 @@ function buildReminderBody(d){
   paras.push(pmName ? ('Prezado(a) ' + pmName + ',') : 'Prezado(a) Gerente de Contrato,');
   paras.push(
     'Este é um lembrete referente ao e-mail de acompanhamento de SPI (Schedule Performance Index) enviado sobre o ' +
-    'projeto ' + d.id + ' — ' + d.project + ' | ' + d.scope + ', sob execução da ' + d.company + '. Até o momento, ' +
+    'projeto ' + d.id + ' — ' + emailProjectName(d) + ' | ' + d.scope + ', sob execução da ' + d.company + '. Até o momento, ' +
     'ainda não recebemos seu retorno.'
   );
   paras.push('Pedimos a gentileza de validar as informações e nos posicionar, para que possamos manter o acompanhamento do schedule deste projeto atualizado.');
