@@ -3163,9 +3163,34 @@ function computeWeeklyComparison(currentWeek, previousWeek){
   var prevSpi = previousWeek ? weightedSpi(prevRows) : null;
   var globalDelta = (curSpi !== null && prevSpi !== null) ? (curSpi - prevSpi) : null;
 
+  // SPI por faixa de % físico (semana anterior x atual) e projetos que mudaram de faixa
+  var BAND_ORDER = ['0-45%', '45-90%', '90%+'];
+  var bandRank = function(b){ var i = BAND_ORDER.indexOf(b); return i < 0 ? 9 : i; };
+  var bandChanges = [];
+  curRows.forEach(function(d){
+    var prev = prevByProject[d.project];
+    if (prev && prev.band && d.band && prev.band !== d.band){
+      bandChanges.push({ project: d.project, company: d.company, prevBand: prev.band, curBand: d.band, prevSpi: prev.spi, curSpi: d.spi, prevPct: prev.pct_complete, curPct: d.pct_complete });
+    }
+  });
+  bandChanges.sort(function(a, b){ return (reportCompanyRank(a.company) - reportCompanyRank(b.company)) || (bandRank(a.curBand) - bandRank(b.curBand)) || String(a.project).localeCompare(String(b.project)); });
+  var bands = BAND_ORDER.map(function(band){
+    var cur = curRows.filter(function(d){ return d.band === band; });
+    var prv = prevRows.filter(function(d){ return d.band === band; });
+    var cs = weightedSpi(cur), ps = previousWeek ? weightedSpi(prv) : null;
+    return {
+      band: band, curCount: cur.length, prevCount: prv.length, curSpi: cs, prevSpi: ps,
+      delta: (cs !== null && ps !== null) ? cs - ps : null,
+      entered: bandChanges.filter(function(c){ return c.curBand === band; }).map(function(c){ return c.project; }),
+      left: bandChanges.filter(function(c){ return c.prevBand === band; }).map(function(c){ return c.project; })
+    };
+  });
+
   return {
     currentWeek: currentWeek,
     previousWeek: previousWeek,
+    bands: bands,
+    bandChanges: bandChanges,
     curSpi: curSpi,
     prevSpi: prevSpi,
     globalDelta: globalDelta,
@@ -3269,6 +3294,8 @@ function renderWeeklyReport(report){
   renderList('reportImprovedList', 'reportImprovedTitle', report.improved, 'Melhoraram', 'good');
   renderList('reportWorsenedList', 'reportWorsenedTitle', report.worsened, 'Pioraram', 'crit');
 
+  renderReportBands(report);
+
   var notesEl = document.getElementById('reportNotes');
   if (notesEl){
     var notes = [];
@@ -3277,6 +3304,51 @@ function renderWeeklyReport(report){
     notesEl.textContent = notes.join(' ');
     notesEl.hidden = !notes.length;
   }
+}
+function fmtSignedSpi(v){ return v === null || v === undefined ? '—' : (v > 0 ? '+' : '') + fmtSpi(v); }
+// bloco "SPI por faixa de % físico" + "Projetos que mudaram de faixa" no modal do relatório
+function renderReportBands(report){
+  var box = document.getElementById('reportBands');
+  if (!box){
+    box = document.createElement('div');
+    box.id = 'reportBands';
+    box.style.cssText = 'margin-top:18px;';
+    var cols = document.querySelector('#reportOverlay .report-columns');
+    if (cols && cols.parentNode) cols.parentNode.insertBefore(box, cols.nextSibling);
+    else return;
+  }
+  box.innerHTML = '';
+  var esc = function(t){ return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var spiSpan = function(v){ return v === null || v === undefined ? '—' : '<span class="bd-val ' + statusOf(v) + '">' + fmtSpi(v) + '</span>'; };
+  var deltaSpan = function(d, prev){
+    if (d === null || d === undefined) return '—';
+    var cls = d > SPI_EPSILON ? 'good' : (d < -SPI_EPSILON ? 'crit' : '');
+    return '<span class="report-delta ' + cls + '">' + fmtSignedSpi(d) + ' (' + fmtPctChange(d, prev) + ')</span>';
+  };
+  var html = '<div class="report-col-title">SPI por faixa de % físico concluído</div>'
+    + '<table class="mini-table" style="width:100%"><thead><tr><th>Faixa</th><th class="num">Proj. ant.</th><th class="num">SPI ant.</th><th class="num">Proj. atual</th><th class="num">SPI atual</th><th class="num">Variação</th></tr></thead><tbody>';
+  report.bands.forEach(function(b){
+    var moves = [];
+    if (b.entered.length) moves.push('entraram: ' + b.entered.map(esc).join(', '));
+    if (b.left.length) moves.push('saíram: ' + b.left.map(esc).join(', '));
+    html += '<tr><td>' + esc(b.band) + '</td><td class="num">' + (report.previousWeek ? b.prevCount : '—') + '</td><td class="num">' + spiSpan(b.prevSpi) + '</td><td class="num">' + b.curCount + '</td><td class="num">' + spiSpan(b.curSpi) + '</td><td class="num">' + deltaSpan(b.delta, b.prevSpi) + '</td></tr>';
+    if (moves.length) html += '<tr><td colspan="6" style="font-size:11px;color:var(--text-muted);padding-top:0">' + moves.join(' · ') + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  html += '<div class="report-col-title" style="margin-top:16px">Projetos que mudaram de faixa (' + report.bandChanges.length + ')</div>';
+  if (!report.bandChanges.length){
+    html += '<div class="report-empty">Nenhum projeto mudou de faixa.</div>';
+  } else {
+    html += '<div class="report-list">';
+    report.bandChanges.forEach(function(c){
+      var d = (Number(c.curSpi) || 0) - (Number(c.prevSpi) || 0);
+      html += '<div class="report-row"><span class="report-row-name">' + esc(c.project) + ' (' + esc(c.company) + ')<span style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px">' + esc(c.prevBand) + ' &rarr; ' + esc(c.curBand) + '</span></span>'
+        + '<span class="report-row-vals" style="text-align:right">' + fmtSpi(c.prevSpi) + ' <span class="report-arrow">&rarr;</span> ' + fmtSpi(c.curSpi) + ' ' + deltaSpan(d, c.prevSpi)
+        + '<span style="display:block;font-size:11px;color:var(--text-muted);margin-top:2px">' + esc(physLine(c)) + '</span></span></div>';
+    });
+    html += '</div>';
+  }
+  box.innerHTML = html;
 }
 function buildReportText(report){
   var lines = [];
@@ -3306,6 +3378,21 @@ function buildReportText(report){
   report.worsened.forEach(function(item){
     lines.push('  - ' + item.project + ' (' + item.company + '): ' + fmtSpi(item.prevSpi) + ' -> ' + fmtSpi(item.curSpi) + ' (' + fmtSpi(item.delta) + ' | ' + fmtPctChange(item.delta, item.prevSpi) + ') | ' + physLine(item));
   });
+  if (report.bands){
+    lines.push('');
+    lines.push('SPI POR FAIXA DE % FÍSICO');
+    report.bands.forEach(function(b){
+      lines.push('  - ' + b.band + ': ' + (b.prevSpi !== null ? fmtSpi(b.prevSpi) : '—') + ' (' + b.prevCount + ' proj.) -> ' + (b.curSpi !== null ? fmtSpi(b.curSpi) : '—') + ' (' + b.curCount + ' proj.) | Variação: ' + fmtSignedSpi(b.delta) + ' (' + fmtPctChange(b.delta, b.prevSpi) + ')'
+        + (b.entered.length ? ' | Entraram: ' + b.entered.join(', ') : '') + (b.left.length ? ' | Saíram: ' + b.left.join(', ') : ''));
+    });
+    lines.push('');
+    lines.push('PROJETOS QUE MUDARAM DE FAIXA (' + report.bandChanges.length + ')');
+    if (!report.bandChanges.length) lines.push('  Nenhum.');
+    report.bandChanges.forEach(function(c){
+      var d = (Number(c.curSpi) || 0) - (Number(c.prevSpi) || 0);
+      lines.push('  - ' + c.project + ' (' + c.company + '): ' + c.prevBand + ' -> ' + c.curBand + ' | SPI ' + fmtSpi(c.prevSpi) + ' -> ' + fmtSpi(c.curSpi) + ' (' + fmtSignedSpi(d) + ') | ' + physLine(c));
+    });
+  }
   if (report.onlyInCurrent.length){
     lines.push('');
     lines.push('PROJETOS NOVOS NESTA SEMANA (sem SPI anterior): ' + report.onlyInCurrent.map(function(d){ return d.project; }).join(', '));
@@ -3448,6 +3535,22 @@ function buildReportXlsxBlob(report){
   report.worsened.forEach(function(item){
     addRow([item.project, item.company, fmtSpi(item.prevSpi), fmtSpi(item.curSpi), fmtSpi(item.delta), fmtPctChange(item.delta, item.prevSpi), fmtPhysPct(item.prevPct), fmtPhysPct(item.curPct), fmtPhysDelta(item.prevPct, item.curPct)]);
   });
+  if (report.bands){
+    addRow([]);
+    addRow(['SPI por faixa de % físico']);
+    addRow(['Faixa', 'Projetos ant.', 'SPI anterior', 'Projetos atual', 'SPI atual', 'Variação', 'Variação %', 'Entraram', 'Saíram']);
+    report.bands.forEach(function(b){
+      addRow([b.band, String(b.prevCount), b.prevSpi !== null ? fmtSpi(b.prevSpi) : '—', String(b.curCount), b.curSpi !== null ? fmtSpi(b.curSpi) : '—', fmtSignedSpi(b.delta), fmtPctChange(b.delta, b.prevSpi), b.entered.join(', '), b.left.join(', ')]);
+    });
+    addRow([]);
+    addRow(['Projetos que mudaram de faixa (' + report.bandChanges.length + ')']);
+    addRow(['Projeto', 'Empresa', 'Faixa anterior', 'Faixa atual', 'SPI anterior', 'SPI atual', 'Variação', '% físico anterior', '% físico atual']);
+    if (!report.bandChanges.length) addRow(['Nenhum']);
+    report.bandChanges.forEach(function(c){
+      var d = (Number(c.curSpi) || 0) - (Number(c.prevSpi) || 0);
+      addRow([c.project, c.company, c.prevBand, c.curBand, fmtSpi(c.prevSpi), fmtSpi(c.curSpi), fmtSignedSpi(d), fmtPhysPct(c.prevPct), fmtPhysPct(c.curPct)]);
+    });
+  }
   if (report.onlyInCurrent.length){
     addRow([]);
     addRow(['Projetos novos nesta semana (sem SPI anterior)']);
