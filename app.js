@@ -34,7 +34,10 @@ var COMPANY_SPI_PANEL = {
 var AUTH_USERS = [
   { name: 'Wesley Jacob', password: 'wj@123', role: 'admin', companyScope: null },
   { name: 'JKA Construction Inc.', password: null, role: 'viewer', companyScope: 'JKA' },
-  { name: 'Prestige Construction Group', password: null, role: 'viewer', companyScope: 'Prestige' }
+  { name: 'Prestige Construction Group', password: null, role: 'viewer', companyScope: 'Prestige' },
+  // site geral.html: somente leitura, as duas empresas juntas (com filtro de
+  // empresa), sem nada de e-mail aos PMs — SPI_FORCED_VIEW = 'Geral'.
+  { name: 'JKA + Prestige', password: null, role: 'viewer', companyScope: null, generalView: true }
 ];
 var AUTH_SESSION_KEY = 'spi-auth-user';
 var authOverrides = {}; // { nome: novaSenha } — senhas trocadas pela tela "Alterar senha", sobrepõem AUTH_USERS
@@ -115,7 +118,10 @@ function applyRolePermissions(){
   var companyLine = document.getElementById('id-company-line');
   var companyNameEl = document.getElementById('id-company-name');
   if (companyLine && companyNameEl){
-    if (currentUserCompanyScope){
+    if (!isAdminUser() && !currentUserCompanyScope){
+      companyNameEl.textContent = 'JKA + Prestige — visão geral';
+      companyLine.hidden = false;
+    } else if (currentUserCompanyScope){
       var scopedUser = AUTH_USERS.find(function(u){ return u.companyScope === currentUserCompanyScope; });
       companyNameEl.textContent = (scopedUser && scopedUser.name) || currentUserCompanyScope;
       companyLine.hidden = false;
@@ -168,6 +174,7 @@ async function initLogin(){
   // claude.ai, que nem sempre repassa a query string do link para a página).
   if (SPI_FORCED_VIEW){
     var forcedUser = AUTH_USERS.find(function(u){
+      if (SPI_FORCED_VIEW.toLowerCase() === 'geral') return !!u.generalView;
       return u.companyScope && u.companyScope.toLowerCase() === SPI_FORCED_VIEW.toLowerCase();
     });
     if (forcedUser){ showDashboard(forcedUser.name); return; }
@@ -1212,8 +1219,9 @@ async function renderSiteAccess(){
   var add = function(box, text, sub){ var d = document.createElement('div'); d.textContent = text; if (sub){ var s2 = document.createElement('span'); s2.className = 'acc-sub'; s2.textContent = ' · ' + sub; d.appendChild(s2); } box.appendChild(d); };
   var sum = document.getElementById('accessSummary');
   sum.innerHTML = '';
-  ['JKA', 'Prestige'].forEach(function(co){
+  ['JKA', 'Prestige', 'Geral'].forEach(function(co){
     var all = rows.filter(function(x){ return x.company === co; });
+    if (co === 'Geral' && !all.length) return;
     var w = all.filter(function(x){ return new Date(x.created_at).getTime() >= week; });
     add(sum, co + ': ' + w.length + ' na semana (' + uniq(w) + (uniq(w) === 1 ? ' navegador' : ' navegadores') + ')',
       all.length ? all.length + ' em 30 dias · último ' + formatAccessDate(all[0].created_at) : 'nenhum em 30 dias');
