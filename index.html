@@ -452,6 +452,22 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .evo-delta.good{ color: var(--status-good); font-weight:600; }
 .evo-delta.crit{ color: var(--status-critical); font-weight:600; }
 .evo-delta.flat{ color: var(--text-muted); }
+/* destaque ao passar o mouse na evolução do SPI global */
+.spi-evo-chart .evo-hit{ fill: transparent; cursor: crosshair; }
+.spi-evo-chart .evo-guide{ stroke: var(--text-muted); stroke-width:1; stroke-dasharray: 2 3; opacity:0; pointer-events:none; }
+.spi-evo-chart .evo-hl{ opacity:0; pointer-events:none; font-weight:700; font-size:12px; paint-order: stroke; stroke: var(--surface-1); stroke-width:4px; stroke-linejoin: round; }
+.spi-evo-chart .evo-hl-date{ fill: var(--text-primary); font-weight:600; }
+.spi-evo-chart .evo-hl-ring{ fill:none; stroke-width:2; opacity:0; pointer-events:none; }
+.spi-evo-chart .evo-xlab{ pointer-events:none; transition: opacity .12s ease; }
+.spi-evo-chart .evo-dot, .spi-evo-chart .evo-bar{ pointer-events:none; transition: opacity .12s ease; }
+.spi-evo-chart svg.has-hover .evo-week:not(.hover) .evo-dot,
+.spi-evo-chart svg.has-hover .evo-week:not(.hover) .evo-bar{ opacity:.3; }
+.spi-evo-chart svg.has-hover .evo-xlab{ opacity:.25; }
+.spi-evo-chart .evo-week.hover .evo-guide{ opacity:.8; }
+.spi-evo-chart .evo-week.hover .evo-hl, .spi-evo-chart .evo-week.hover .evo-hl-ring{ opacity:1; }
+.spi-evo-chart .evo-week.hover .evo-dot{ r: 5; }
+.spi-evo-chart .evo-week.hover .evo-bar{ opacity:1; stroke: var(--text-primary); stroke-width:1.5; }
+.spi-evo-table tr.hl td{ background: var(--sap-accent-soft, var(--surface-2)); }
 
 /* exclude-project action + management modal */
 .btn.exclude-row{ padding: 4px 9px; font-size:11.5px; }

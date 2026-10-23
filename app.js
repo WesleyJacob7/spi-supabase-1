@@ -3757,6 +3757,7 @@ function renderSpiEvolution(){
   data.slice().reverse().forEach(function(r){
     var tr = document.createElement('tr');
     if (r.week === state.week) tr.className = 'sel';
+    tr.setAttribute('data-week', r.week);
     var c = evoDeltaClass(r.delta);
     var arrow = c === 'good' ? '▲ ' : (c === 'crit' ? '▼ ' : '');
     tr.innerHTML = '<td title="Semana ' + escapeHtmlEvo(r.week) + '">' + escapeHtmlEvo(r.ref) + '</td>'
@@ -3798,21 +3799,36 @@ function renderSpiEvolution(){
   var path = evoSmoothPath(pts);
   if (pts.length > 1) s += '<path class="evo-area" d="' + path + ' L' + pts[pts.length - 1][0].toFixed(1) + ',' + (top + h1) + ' L' + pts[0][0].toFixed(1) + ',' + (top + h1) + ' Z"/>';
   s += '<path class="evo-line" d="' + path + '"/>';
-  data.forEach(function(r, i){
-    if (r.week === state.week) s += '<circle class="evo-sel-ring" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="7"/>';
-    s += '<circle class="evo-dot' + (r.week === state.week ? ' sel' : '') + '" cx="' + xAt(i).toFixed(1) + '" cy="' + yAt(r.spi).toFixed(1) + '" r="' + (r.week === state.week ? 3.5 : 3) + '" fill="' + color[statusOf(r.spi)] + '"><title>' + escapeHtmlEvo(r.ref) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)</title></circle>';
-  });
   // painel 2
   s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top + h1 + gap - 10) + '">Variação vs. semana anterior</text>';
   s += '<line class="evo-axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y0 + '" y2="' + y0 + '"/>';
   s += '<text x="' + (padL - 6) + '" y="' + (yD(dmax) + 4) + '" text-anchor="end">+' + fmtSpi(dmax) + '</text>'
     + '<text x="' + (padL - 6) + '" y="' + (y0 + 4) + '" text-anchor="end">0</text>'
     + '<text x="' + (padL - 6) + '" y="' + (yD(-dmax) + 4) + '" text-anchor="end">−' + fmtSpi(dmax) + '</text>';
+  // um grupo por semana (ponto + barra + destaque ao passar o mouse): a coluna inteira
+  // da semana é área de hover, com linha-guia vertical, ponto/barra realçados e os valores.
+  var colW = n > 1 ? step : (W - padL - padR);
   data.forEach(function(r, i){
-    if (r.delta === null) return;
-    var c = evoDeltaClass(r.delta), y = yD(r.delta);
-    var yTop = Math.min(y, y0), hh = Math.max(Math.abs(y - y0), 1.5);
-    s += '<rect x="' + (xAt(i) - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + color[c] + '"' + (r.week === state.week ? '' : ' opacity="0.85"') + '><title>' + escapeHtmlEvo(r.ref) + ': ' + fmtSignedSpi(r.delta) + ' (' + fmtSignedPct(r.pct) + ')</title></rect>';
+    var x = xAt(i), py = yAt(r.spi), isSel = r.week === state.week;
+    var tip = escapeHtmlEvo(r.ref) + ' — SPI ' + fmtSpi(r.spi) + (r.delta === null ? '' : ' (' + fmtSignedSpi(r.delta) + ' · ' + fmtSignedPct(r.pct) + ')') + ' — ' + r.n + ' projeto(s)';
+    var g = '<g class="evo-week" data-week="' + escapeHtmlEvo(r.week) + '">';
+    g += '<line class="evo-guide" x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + top + '" y2="' + (H - bottom) + '"/>';
+    if (r.delta !== null){
+      var c = evoDeltaClass(r.delta), y = yD(r.delta);
+      var yTop = Math.min(y, y0), hh = Math.max(Math.abs(y - y0), 1.5);
+      g += '<rect class="evo-bar" x="' + (x - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + color[c] + '"' + (isSel ? '' : ' opacity="0.85"') + '/>';
+      var ly = r.delta >= 0 ? yTop - 6 : yTop + hh + 13;
+      g += '<text class="evo-hl evo-hl-bar" x="' + x.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" style="fill:' + color[c] + '">' + fmtSignedSpi(r.delta) + ' (' + fmtSignedPct(r.pct) + ')</text>';
+    }
+    if (isSel) g += '<circle class="evo-sel-ring" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="7"/>';
+    g += '<circle class="evo-hl-ring" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="9" style="stroke:' + color[statusOf(r.spi)] + '"/>';
+    g += '<circle class="evo-dot' + (isSel ? ' sel' : '') + '" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="' + (isSel ? 3.5 : 3) + '" fill="' + color[statusOf(r.spi)] + '"/>';
+    var anc = n > 1 && i === 0 ? 'start' : (n > 1 && i === n - 1 ? 'end' : 'middle');
+    g += '<text class="evo-hl evo-hl-spi" x="' + x.toFixed(1) + '" y="' + (py - 14).toFixed(1) + '" text-anchor="' + anc + '" style="fill:' + color[statusOf(r.spi)] + '">' + fmtSpi(r.spi) + '</text>';
+    g += '<text class="evo-hl evo-hl-date" x="' + x.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(r.ref) + '</text>';
+    g += '<rect class="evo-hit" x="' + (x - colW / 2).toFixed(1) + '" y="' + top + '" width="' + colW.toFixed(1) + '" height="' + (H - bottom - top + 24) + '"><title>' + tip + '</title></rect>';
+    g += '</g>';
+    s += g;
   });
   // eixo x (semanas) — rótulos espaçados para não sobrepor
   var every = Math.max(1, Math.ceil(n / 9));
@@ -3820,10 +3836,30 @@ function renderSpiEvolution(){
     if (i !== n - 1 && (i % every || n - 1 - i < every)) return;
     var anc = n > 1 && i === 0 ? 'start' : (n > 1 && i === n - 1 ? 'end' : 'middle');
     var xx = anc === 'start' ? xAt(i) - 4 : (anc === 'end' ? xAt(i) + 4 : xAt(i));
-    s += '<text x="' + xx.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(r.ref) + '</text>';
+    s += '<text class="evo-xlab" x="' + xx.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(r.ref) + '</text>';
   });
   s += '</svg>';
   box.innerHTML = s;
+  wireEvoHover(box, body);
+}
+// realce ao passar o mouse: a semana sob o mouse fica em destaque (guia, ponto, barra e valores)
+// e as demais esmaecem; a linha correspondente na tabela abaixo também é destacada.
+function wireEvoHover(box, body){
+  var svg = box.querySelector('svg'); if (!svg) return;
+  var cur = null;
+  function set(g){
+    if (g === cur) return;
+    if (cur) cur.classList.remove('hover');
+    Array.prototype.forEach.call(body.querySelectorAll('tr.hl'), function(tr){ tr.classList.remove('hl'); });
+    cur = g;
+    svg.classList.toggle('has-hover', !!g);
+    if (!g) return;
+    g.classList.add('hover');
+    var wk = g.getAttribute('data-week');
+    Array.prototype.forEach.call(body.querySelectorAll('tr[data-week]'), function(tr){ if (tr.getAttribute('data-week') === wk) tr.classList.add('hl'); });
+  }
+  svg.addEventListener('mouseover', function(e){ set(e.target.closest ? e.target.closest('.evo-week') : null); });
+  svg.addEventListener('mouseleave', function(){ set(null); });
 }
 function evoSmoothPath(p){
   if (!p.length) return '';
