@@ -3897,7 +3897,11 @@ function render(){
   var crit = rows.filter(function(d){ return d.pct_complete > 0 && statusOf(d.spi) === 'crit'; }).length;
   var notStarted = rows.filter(function(d){ return d.pct_complete === 0; }).length;
 
-  document.getElementById('kpiAvgSpi').textContent = sumSched > 0 ? fmtSpi(spiGlobal) : '—';
+  var kpiAvgSpiEl = document.getElementById('kpiAvgSpi');
+  kpiAvgSpiEl.textContent = sumSched > 0 ? fmtSpi(spiGlobal) : '—';
+  // cor do SPI Global conforme a faixa (Bom > 1,00 · Atenção 0,85–1,00 · Crítico < 0,85), mesma regra de statusOf
+  kpiAvgSpiEl.classList.remove('good', 'warn', 'crit');
+  if (sumSched > 0) kpiAvgSpiEl.classList.add(statusOf(spiGlobal));
   document.getElementById('kpiAvgSpiSub').textContent = 'ponderado por duração · ' + rows.length + ' projeto(s)';
   document.getElementById('kpiGood').textContent = good;
   document.getElementById('kpiGoodSub').textContent = withSpi.length ? Math.round(good / withSpi.length * 100) + '% da seleção' : ' ';
