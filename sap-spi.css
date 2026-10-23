@@ -1,0 +1,185 @@
+/* Visual SAP Fiori (Quartz) para o Dashboard SPI — mesmo padrão do site de dossiês.
+   Só sobrepõe o CSS embutido em index.html / jka.html / prestige.html / geral.html.
+   Para voltar ao visual anterior basta tirar o <link> deste arquivo e a <header class="shellbar">. */
+
+:root{
+  color-scheme: light;
+  --page-bg: #f2f2f2;
+  --grid-line: transparent;
+  --surface-1: #ffffff;
+  --surface-2: #f7f7f7;
+  --surface-3: #eff1f2;
+  --text-primary: #32363a;
+  --text-secondary: #515559;
+  --text-muted: #6a6d70;
+  --hairline: #e5e5e5;
+  --baseline: #c6c6c6;
+  --border: #d9d9d9;
+  --accent: #0a6ed1;
+  --status-good: #107e3e;
+  --status-good-wash: rgba(16,126,62,0.09);
+  --status-warning-mark: #e9730c;
+  --status-warning-text: #b75b00;
+  --status-warning-wash: rgba(233,115,12,0.11);
+  --status-critical: #bb0000;
+  --status-critical-wash: rgba(187,0,0,0.07);
+  --focus-ring: #0a6ed1;
+  --shadow: 0 0 0.125rem rgba(0,0,0,.10), 0 0.125rem 0.5rem rgba(0,0,0,.06);
+  --overlay: rgba(0,0,0,0.45);
+  --tooltip-bg: #32363a;
+  --tooltip-text: #ffffff;
+  --sap-shell: #354a5f;
+  --sap-shell-text: #ffffff;
+  --sap-shell-muted: #d1e8ff;
+  --sap-shell-btn: rgba(255,255,255,.12);
+  --sap-th-bg: #f2f2f2;
+  --sap-hover: #f5f5f5;
+  --sap-accent-soft: #e5f0fa;
+  --sap-accent-hover: #0854a0;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --page-bg: #1d232a;
+    --grid-line: transparent;
+    --surface-1: #29313a;
+    --surface-2: #232a31;
+    --surface-3: #313a44;
+    --text-primary: #fafafa;
+    --text-secondary: #d3d7d9;
+    --text-muted: #a9b4be;
+    --hairline: #3a4552;
+    --baseline: #5b6875;
+    --border: #3e4955;
+    --accent: #4db1ff;
+    --status-good: #5dc122;
+    --status-good-wash: rgba(93,193,34,0.12);
+    --status-warning-mark: #ff8a3c;
+    --status-warning-text: #ffab5c;
+    --status-warning-wash: rgba(255,138,60,0.13);
+    --status-critical: #ff5a5a;
+    --status-critical-wash: rgba(255,90,90,0.11);
+    --focus-ring: #4db1ff;
+    --shadow: 0 0 0.125rem rgba(0,0,0,.4), 0 0.125rem 0.5rem rgba(0,0,0,.3);
+    --overlay: rgba(0,0,0,0.6);
+    --tooltip-bg: #fafafa;
+    --tooltip-text: #1d232a;
+    --sap-shell: #1a2028;
+    --sap-shell-text: #fafafa;
+    --sap-shell-muted: #a9b4be;
+    --sap-shell-btn: rgba(255,255,255,.08);
+    --sap-th-bg: #313a44;
+    --sap-hover: #333d47;
+    --sap-accent-soft: #1f3a52;
+    --sap-accent-hover: #7cc4ff;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page-bg: #1d232a;
+  --grid-line: transparent;
+  --surface-1: #29313a;
+  --surface-2: #232a31;
+  --surface-3: #313a44;
+  --text-primary: #fafafa;
+  --text-secondary: #d3d7d9;
+  --text-muted: #a9b4be;
+  --hairline: #3a4552;
+  --baseline: #5b6875;
+  --border: #3e4955;
+  --accent: #4db1ff;
+  --status-good: #5dc122;
+  --status-good-wash: rgba(93,193,34,0.12);
+  --status-warning-mark: #ff8a3c;
+  --status-warning-text: #ffab5c;
+  --status-warning-wash: rgba(255,138,60,0.13);
+  --status-critical: #ff5a5a;
+  --status-critical-wash: rgba(255,90,90,0.11);
+  --focus-ring: #4db1ff;
+  --shadow: 0 0 0.125rem rgba(0,0,0,.4), 0 0.125rem 0.5rem rgba(0,0,0,.3);
+  --overlay: rgba(0,0,0,0.6);
+  --tooltip-bg: #fafafa;
+  --tooltip-text: #1d232a;
+  --sap-shell: #1a2028;
+  --sap-shell-text: #fafafa;
+  --sap-shell-muted: #a9b4be;
+  --sap-shell-btn: rgba(255,255,255,.08);
+  --sap-th-bg: #313a44;
+  --sap-hover: #333d47;
+  --sap-accent-soft: #1f3a52;
+  --sap-accent-hover: #7cc4ff;
+}
+
+/* ---- tipografia e fundo ---- */
+body, .btn, .pill, select.wk, textarea, input, select, button,
+h1, .card-title, .modal-title, .login-title, .kpi .label, .kpi .value, .filter-label,
+thead th, td.num, th.num, .status-pill, .id-block, .reminder-alert-title{
+  font-family: "72", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+body, .login-screen{ background-image: none; }
+
+/* ---- shell bar (barra superior escura, igual ao site de dossiês) ---- */
+.shellbar{
+  height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  background: var(--sap-shell); color: var(--sap-shell-text);
+  position: sticky; top: 0; z-index: 40;
+  box-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+.shellbar[hidden]{ display: none; }
+.shellbar .sb-logo{
+  width: 28px; height: 28px; border-radius: 4px; background: linear-gradient(135deg,#1b90ff,#0a6ed1);
+  display: grid; place-items: center; font-weight: 700; font-size: 14px; color: #fff; flex: none;
+}
+.shellbar .sb-title{ font-size: 15px; font-weight: 600; white-space: nowrap; }
+.shellbar .sb-sep{ width: 1px; height: 20px; background: rgba(255,255,255,.25); }
+.shellbar .sb-sub{ font-size: 13px; color: var(--sap-shell-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 520px){ .shellbar .sb-sep, .shellbar .sb-sub{ display: none; } }
+
+/* ---- cabeçalho da página (object page header) ---- */
+.wrap{ padding-top: 20px; }
+header.top{ border-bottom-color: var(--border); padding-bottom: 14px; }
+header.top h1{ font-size: 22px; font-weight: 400; letter-spacing: 0; line-height: 1.25; margin: 2px 0 6px; }
+.lede{ font-size: 13.5px; color: var(--text-muted); }
+.id-block{ font-size: 12px; }
+
+/* ---- cartões, KPIs, filtros: cantos de 4px e sombra discreta ---- */
+.card, .kpi, .filters, .table-card, .grid-card, .modal, .login-card, .toast,
+.reminder-alert-item, .tooltip{ border-radius: 4px; }
+.card-title{ font-size: 16px; font-weight: 600; letter-spacing: 0; }
+.kpi{ padding: 14px 16px; }
+.kpi .label, .filter-label, thead th, .form-field label, .login-field label, .excluded-section{
+  text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 400; color: var(--text-muted);
+}
+.kpi .value{ font-size: 30px; font-weight: 300; }
+.kpi .value.good, .kpi .value.warn, .kpi .value.crit{ font-weight: 400; }
+
+/* ---- tabelas (cabeçalho cinza de lista Fiori) ---- */
+thead th{ background: var(--sap-th-bg); color: var(--text-secondary); font-weight: 600; }
+tbody tr:hover td{ background: var(--sap-hover); }
+tr.row-isolated td{ background: var(--sap-accent-soft); }
+.status-pill{ border-radius: 4px; }
+
+/* ---- botões Fiori ---- */
+.btn{ border-radius: 4px; padding: 6px 12px; font-weight: 400; background: var(--surface-1); color: var(--accent); border-color: var(--border); }
+.btn:hover:not(:disabled){ background: var(--sap-accent-soft); }
+.btn.small{ border-radius: 4px; }
+.btn.ghost{ background: transparent; border-color: transparent; }
+.btn.ghost:hover:not(:disabled){ background: var(--sap-accent-soft); border-color: transparent; }
+.btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary:hover:not(:disabled){ background: var(--sap-accent-hover); border-color: var(--sap-accent-hover); filter: none; }
+.btn.danger-outline{ background: var(--surface-1); }
+.btn.danger{ font-weight: 600; }
+
+/* ---- filtros: seletores e botões segmentados ---- */
+select.wk, textarea.reply-input, .login-field select, .login-field input,
+.form-field input, .form-field select, .form-field textarea{
+  border-radius: 4px; background: var(--surface-1); box-shadow: inset 0 -1px 0 var(--border);
+}
+.pill{ border-radius: 4px; font-weight: 400; background: var(--surface-1); color: var(--text-secondary); }
+.pill:hover{ background: var(--sap-hover); }
+.pill[aria-pressed="true"]{ background: var(--surface-1); border-color: currentColor; font-weight: 600; box-shadow: inset 0 -2px 0 currentColor; }
+.pill[aria-pressed="true"].all{ background: var(--sap-accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* ---- diálogos ---- */
+.modal-title, .login-title{ font-weight: 600; letter-spacing: 0; }
+.modal-title{ font-size: 17px; }
