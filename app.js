@@ -283,6 +283,11 @@ function isHiddenRow(d){
   var endWeek = endedProjects[d.project];
   return !!(endWeek && d.week >= endWeek);
 }
+// Projeto encerrado guarda o histórico só até a semana anterior ao encerramento:
+// lançamentos da semana de encerramento em diante são descartados (não voltam ao salvar).
+function pruneEndedRows(data){
+  return data.filter(function(d){ var endWeek = endedProjects[d.project]; return !(endWeek && d.week >= endWeek); });
+}
 
 var STATUS_COLOR = { good: 'var(--status-good)', warn: 'var(--status-warning-mark)', crit: 'var(--status-critical)' };
 
@@ -1739,7 +1744,7 @@ function newRowKey(){
 // semana; a cópia de fato só acontece se a pessoa confirmar.
 function advanceWeek(){
   if (!state.week) return;
-  var rows = DATA.filter(function(d){ return d.week === state.week; });
+  var rows = DATA.filter(function(d){ return d.week === state.week && !isHiddenRow(d); });
   if (!rows.length){ showToast('Não há projetos na semana atual para avançar.', 'warn'); return; }
   var nextLabel = nextWeekLabel(state.week);
   if (!nextLabel){ showToast('Não foi possível calcular a próxima semana.', 'error'); return; }
@@ -1748,7 +1753,7 @@ function advanceWeek(){
 async function performAdvanceWeek(){
   var btn = document.getElementById('btnAdvanceWeek');
   if (!state.week) return;
-  var rows = DATA.filter(function(d){ return d.week === state.week; });
+  var rows = DATA.filter(function(d){ return d.week === state.week && !isHiddenRow(d); });
   if (!rows.length) return;
   var nextLabel = nextWeekLabel(state.week);
   if (!nextLabel) return;
@@ -1820,12 +1825,12 @@ function initAdvanceConfirm(){
 /* ---------- excluir todos os lançamentos de uma semana (ex: semana incluída por engano) ---------- */
 function btnDeleteWeekClick(){
   if (!state.week) return;
-  var rows = DATA.filter(function(d){ return d.week === state.week; });
+  var rows = DATA.filter(function(d){ return d.week === state.week && !isHiddenRow(d); });
   if (!rows.length){ showToast('Não há lançamentos nesta semana para excluir.', 'warn'); return; }
   openDeleteWeekConfirm(state.week, rows.length);
 }
 async function deleteWeek(weekLabel){
-  var rows = DATA.filter(function(d){ return d.week === weekLabel; });
+  var rows = DATA.filter(function(d){ return d.week === weekLabel && !isHiddenRow(d); });
   if (!rows.length) return;
   var btn = document.getElementById('btnDeleteWeek');
   if (btn) btn.disabled = true;
@@ -2004,6 +2009,7 @@ async function persistState(){
   try {
     var delRes = await supabaseClient.from('spi_records').delete().not('row_key', 'is', null);
     if (delRes.error) throw delRes.error;
+    DATA = pruneEndedRows(DATA);
     var rows = DATA.map(recordToRow);
     for (var i = 0; i < rows.length; i += 500){
       var insRes = await supabaseClient.from('spi_records').insert(rows.slice(i, i + 500));
@@ -2935,11 +2941,14 @@ async function excludeProject(project){
 }
 async function endProject(project, fromWeek){
   endedProjects[project] = fromWeek;
+  var before = DATA.length;
+  DATA = pruneEndedRows(DATA);
+  if (DATA.length !== before){ await persistState(); recomputeDerivedLists(); refreshFilterUI(); }
   if (state.isolatedProject === project){ state.isolatedProject = null; state.trendMode = false; }
   await persistExcluded();
   updateExcludedButtonLabel();
   render();
-  showToast('"' + project + '" foi encerrado a partir da semana ' + fromWeek + '. As semanas anteriores continuam no painel.', '');
+  showToast('"' + project + '" foi encerrado a partir da semana ' + fromWeek + '. O histórico fica até a semana anterior; lançamentos dessa semana em diante foram removidos.', '');
 }
 async function reopenProject(project){
   delete endedProjects[project];
