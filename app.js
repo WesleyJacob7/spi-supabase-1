@@ -2007,6 +2007,15 @@ async function persistState(){
     return true;
   }
   try {
+    // trava de segurança: nunca regrava a tabela com bem menos lançamentos do que existem no banco
+    // (ex.: aba aberta com dados não carregados / vazios) — evita apagar o histórico inteiro
+    var cntRes = await supabaseClient.from('spi_records').select('row_key', { count: 'exact', head: true });
+    if (cntRes.error) throw cntRes.error;
+    var dbCount = cntRes.count || 0, newCount = pruneEndedRows(DATA).length;
+    if (dbCount > 0 && (newCount === 0 || newCount < dbCount * 0.8)){
+      showToast('Gravação bloqueada: o painel tem ' + newCount + ' lançamento(s) carregados e o banco tem ' + dbCount + '. Recarregue a página (Ctrl+F5) antes de salvar.', 'error');
+      return false;
+    }
     var delRes = await supabaseClient.from('spi_records').delete().not('row_key', 'is', null);
     if (delRes.error) throw delRes.error;
     DATA = pruneEndedRows(DATA);
