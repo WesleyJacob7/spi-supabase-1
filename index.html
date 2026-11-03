@@ -654,6 +654,16 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
 }
 </style>
 <link rel="stylesheet" href="sap-spi.css?v=20261023a">
+<style>
+/* versão de teste: separa Painel (gráficos) de Ações (e-mails e lembretes) */
+.view-tabs{ display:flex; gap:0; border-bottom:1px solid var(--border); margin:0 0 18px; }
+.view-tab{ font:inherit; font-size:14px; padding:11px 18px 9px; background:transparent; border:0; border-bottom:3px solid transparent; color:var(--text-secondary); cursor:pointer; }
+.view-tab:hover{ color:var(--accent); }
+.view-tab.active{ color:var(--accent); font-weight:600; border-bottom-color:var(--accent); }
+.view-badge{ display:inline-block; min-width:18px; padding:0 6px; margin-left:4px; border-radius:9px; font-size:11px; line-height:18px; text-align:center; font-weight:700; color:#fff; background:var(--accent); }
+#dashWrap[data-view="painel"] > .reminder-alert-card{ display:none; }
+#dashWrap[data-view="acoes"] > :not(header):not(.view-tabs):not(.reminder-alert-card){ display:none; }
+</style>
 </head>
 <body>
 <header class="shellbar"><div class="sb-logo">S</div><div class="sb-title">Dashboard SPI</div><div class="sb-sep"></div><div class="sb-sub">JKA &amp; Prestige · Admin</div></header>
@@ -706,8 +716,13 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     </div>
   </header>
 
+<div class="view-tabs" id="viewTabs" role="tablist">
+    <button type="button" class="view-tab active" data-view="painel" role="tab">Painel</button>
+    <button type="button" class="view-tab" data-view="acoes" role="tab">Ações <span class="view-badge" id="actionsBadge" hidden></span></button>
+  </div>
+
 <div class="card reminder-alert-card fade-in" id="emailDueAlertCard" hidden>
-    <details class="reminder-alert-main" id="emailDueAlertMainSection">
+    <details class="reminder-alert-main" id="emailDueAlertMainSection" open>
       <summary class="reminder-alert-head">
         <div class="reminder-alert-title">E-mail original pendente <span id="emailDueAlertCount" style="opacity:.8;font-weight:600"></span></div>
         <p class="reminder-alert-sub">Projetos da semana atual sem o e-mail de acompanhamento de SPI em dia (novos, esquecidos ou com o ciclo mensal vencido).</p>
@@ -717,7 +732,7 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   </div>
 
   <div class="card reminder-alert-card fade-in" id="reminderAlertCard" hidden>
-    <details class="reminder-alert-main" id="reminderAlertMainSection">
+    <details class="reminder-alert-main" id="reminderAlertMainSection" open>
       <summary class="reminder-alert-head">
         <div class="reminder-alert-title">Lembretes pendentes</div>
         <p class="reminder-alert-sub">Projetos com e-mail enviado há mais de 1 semana, ainda sem lembrete nem resposta do PM.</p>
@@ -727,7 +742,7 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   </div>
 
   <div class="card reminder-alert-card noreply-card fade-in" id="noReplyAlertCard" hidden>
-    <details class="reminder-alert-main" id="noReplyAlertMainSection">
+    <details class="reminder-alert-main" id="noReplyAlertMainSection" open>
       <summary class="reminder-alert-head">
         <div class="reminder-alert-title" id="noReplyAlertTitle">Sem resposta do PM</div>
         <p class="reminder-alert-sub">Projetos com e-mail de SPI enviado e nenhuma resposta do PM registrada no histórico depois do último envio, agrupados por PM.</p>
@@ -1157,5 +1172,23 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script>
+(function(){
+  var wrap=document.getElementById('dashWrap'), tabs=document.getElementById('viewTabs'); if(!wrap||!tabs) return;
+  var KEY='spi-view';
+  function show(v){ wrap.setAttribute('data-view',v);
+    [].forEach.call(tabs.querySelectorAll('.view-tab'),function(b){ b.classList.toggle('active',b.getAttribute('data-view')===v); });
+    try{ localStorage.setItem(KEY,v); }catch(e){}
+    window.dispatchEvent(new Event('resize')); }
+  tabs.addEventListener('click',function(e){ var b=e.target.closest('.view-tab'); if(b) show(b.getAttribute('data-view')); });
+  var saved='painel'; try{ saved=localStorage.getItem(KEY)||'painel'; }catch(e){}
+  show(saved==='acoes'?'acoes':'painel');
+  // número de projetos que pedem ação: e-mail pendente + lembrete + sem resposta
+  function count(){ var n=0; ['emailDueAlertList','reminderAlertList','noReplyAlertList'].forEach(function(id){ var el=document.getElementById(id); if(el) n+=el.querySelectorAll('.reminder-alert-item').length; });
+    var bd=document.getElementById('actionsBadge'); if(bd){ bd.textContent=n; bd.hidden=!n; } }
+  ['emailDueAlertList','reminderAlertList','noReplyAlertList'].forEach(function(id){ var el=document.getElementById(id); if(el) new MutationObserver(count).observe(el,{childList:true,subtree:true}); });
+  count();
+})();
+</script>
 </body>
 </html>
