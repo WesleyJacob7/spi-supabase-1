@@ -1318,8 +1318,17 @@ function emailDueAlertList(){
     if (seen[row.project]) return;
     seen[row.project] = true;
     var info = projectEmailDueInfo(row.project);
-    if (info.status === 'never') items.push({ row: row, reason: 'never' });
-    else if (info.status === 'overdue') items.push({ row: row, reason: 'overdue', dueDate: info.dueDate });
+    if (info.status !== 'never' && info.status !== 'overdue') return;
+    var due = info.status === 'overdue' ? new Date(info.dueDate) : null;
+    items.push({
+      row: row,
+      reason: info.status,
+      dueDate: info.dueDate,
+      // ordena o grupo do PM: quem nunca recebeu primeiro, depois o vencido há mais tempo
+      daysSince: due ? Math.floor((new Date() - due) / (24 * 60 * 60 * 1000)) : Number.MAX_SAFE_INTEGER,
+      pmName: row.pm_name || pmNameForProject(row.project) || '',
+      pmEmail: row.pm_email || pmEmailForProject(row.project) || ''
+    });
   });
   items.sort(function(a, b){
     if (a.reason !== b.reason) return a.reason === 'never' ? -1 : 1;
@@ -1336,30 +1345,43 @@ function renderEmailDueAlert(){
   var countEl = document.getElementById('emailDueAlertCount');
   if (countEl) countEl.textContent = items.length ? '(' + items.length + ')' : '';
   list.innerHTML = '';
-  items.forEach(function(entry){
-    var row = entry.row;
-    var line = document.createElement('div');
-    line.className = 'reminder-alert-item';
-    var info = document.createElement('div');
-    info.className = 'reminder-alert-info';
-    var name = document.createElement('span');
-    name.className = 'reminder-alert-project';
-    name.textContent = projectLabel(row);
-    info.appendChild(name);
-    var sub = document.createElement('span');
-    sub.className = 'reminder-alert-days';
-    sub.textContent = entry.reason === 'never'
-      ? 'Nunca recebeu o e-mail de acompanhamento de SPI'
-      : ('E-mail mensal venceu em ' + fmtDateMDY(isoDateOnly(entry.dueDate)));
-    info.appendChild(sub);
-    line.appendChild(info);
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn ghost small';
-    btn.textContent = 'Enviar e-mail ao PM';
-    btn.addEventListener('click', function(){ openEmailConfirm(row); });
-    line.appendChild(btn);
-    list.appendChild(line);
+  // agrupado por PM, como no card "Sem resposta do PM"
+  groupNoReplyByPm(items).forEach(function(g){
+    var box = document.createElement('div');
+    box.className = 'noreply-group';
+    var head = document.createElement('div');
+    head.className = 'noreply-group-head';
+    var title = document.createElement('span');
+    title.className = 'noreply-group-title';
+    title.textContent = g.pmName + ' · ' + g.company + ' — ' + g.items.length + (g.items.length === 1 ? ' projeto' : ' projetos');
+    head.appendChild(title);
+    box.appendChild(head);
+    g.items.forEach(function(entry){
+      var row = entry.row;
+      var line = document.createElement('div');
+      line.className = 'reminder-alert-item';
+      var info = document.createElement('div');
+      info.className = 'reminder-alert-info';
+      var name = document.createElement('span');
+      name.className = 'reminder-alert-project';
+      name.textContent = projectLabel(row);
+      info.appendChild(name);
+      var sub = document.createElement('span');
+      sub.className = 'reminder-alert-days';
+      sub.textContent = entry.reason === 'never'
+        ? 'Nunca recebeu o e-mail de acompanhamento de SPI'
+        : ('E-mail mensal venceu em ' + fmtDateMDY(isoDateOnly(entry.dueDate)));
+      info.appendChild(sub);
+      line.appendChild(info);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn ghost small';
+      btn.textContent = 'Enviar e-mail ao PM';
+      btn.addEventListener('click', function(){ openEmailConfirm(row); });
+      line.appendChild(btn);
+      box.appendChild(line);
+    });
+    list.appendChild(box);
   });
 }
 
