@@ -1345,8 +1345,20 @@ function renderEmailDueAlert(){
   var countEl = document.getElementById('emailDueAlertCount');
   if (countEl) countEl.textContent = items.length ? '(' + items.length + ')' : '';
   list.innerHTML = '';
-  // agrupado por PM, como no card "Sem resposta do PM"
-  groupNoReplyByPm(items).forEach(function(g){
+  // por empresa (JKA, depois Prestige) e, dentro dela, por PM como no card "Sem resposta do PM"
+  var companies = [];
+  items.forEach(function(e){ if (companies.indexOf(e.row.company) < 0) companies.push(e.row.company); });
+  companies.sort(function(a, b){
+    var ra = a === 'JKA' ? 0 : (a === 'Prestige' ? 1 : 2), rb = b === 'JKA' ? 0 : (b === 'Prestige' ? 1 : 2);
+    return (ra - rb) || String(a).localeCompare(String(b));
+  });
+  companies.forEach(function(company){
+   var ofCompany = items.filter(function(e){ return e.row.company === company; });
+   var companyHead = document.createElement('div');
+   companyHead.className = 'email-due-company';
+   companyHead.textContent = company + ' — ' + ofCompany.length + (ofCompany.length === 1 ? ' projeto' : ' projetos');
+   list.appendChild(companyHead);
+   groupNoReplyByPm(ofCompany).forEach(function(g){
     var box = document.createElement('div');
     box.className = 'noreply-group';
     var head = document.createElement('div');
@@ -1382,6 +1394,7 @@ function renderEmailDueAlert(){
       box.appendChild(line);
     });
     list.appendChild(box);
+   });
   });
 }
 
