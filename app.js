@@ -2788,9 +2788,9 @@ function showTooltip(cx, cy, d, pinned){
     tooltip.appendChild(row);
   });
   tooltip.classList.add('show');
-  positionTooltip(cx, cy);
+  positionTooltip(cx, cy, pinned);
 }
-function positionTooltip(cx, cy){
+function positionTooltip(cx, cy, pinned){
   var tooltip = document.getElementById('tooltip');
   var svg = document.getElementById('chart');
   var shell = document.getElementById('chartShell');
@@ -2818,6 +2818,17 @@ function positionTooltip(cx, cy){
   // makes it overlap that text too.
   var plotTopBound = svgRect.top - shellRect.top + M.top * scale;
   var plotBottomBound = svgRect.top - shellRect.top + (M.top + plotH) * scale;
+
+  // Ao passar o mouse, o card fica sempre colado no ponto: acima dele, ou abaixo
+  // quando não cabe em cima, deslizando na horizontal só para não sair do gráfico.
+  // O desvio dos rótulos abaixo vale apenas para o card fixo (projeto isolado),
+  // pois com tantos nomes no gráfico ele jogava o card para longe do ponto.
+  if (!pinned){
+    var hoverTy = (y - gap - h >= plotTopBound) ? -(h + gap) : gap;
+    var hoverLeft = Math.max(plotLeftBound, Math.min(x - w / 2, plotRightBound - w));
+    tooltip.style.transform = 'translate(' + (hoverLeft - x) + 'px, ' + hoverTy + 'px)';
+    return;
+  }
 
   function rectsOverlap(a, b){
     return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
