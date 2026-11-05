@@ -3138,6 +3138,10 @@ function initExcludedModal(){
 }
 
 /* ---------- SPI por faixa / por empresa (respeita os filtros e a semana atuais) ---------- */
+// nome do projeto + empresa, para os avisos do relatório semanal (ex.: "Swansea Town Offices (JKA)")
+function reportProjectWithCompany(d){
+  return d.company ? d.project + ' (' + d.company + ')' : d.project;
+}
 function weightedSpi(list){
   var sumBase = list.reduce(function(a, d){ return a + (Number(d.baseline_duration) || 0); }, 0);
   var sumSched = list.reduce(function(a, d){ return a + (Number(d.schedule_duration) || 0); }, 0);
@@ -3363,8 +3367,8 @@ function renderWeeklyReport(report){
   var notesEl = document.getElementById('reportNotes');
   if (notesEl){
     var notes = [];
-    if (report.onlyInCurrent.length) notes.push(report.onlyInCurrent.length + ' projeto(s) novo(s) nesta semana (sem SPI anterior para comparar): ' + report.onlyInCurrent.map(function(d){ return d.project; }).join(', ') + '.');
-    if (report.onlyInPrevious.length) notes.push(report.onlyInPrevious.length + ' projeto(s) da semana anterior não aparecem nesta semana: ' + report.onlyInPrevious.map(function(d){ return d.project; }).join(', ') + '.');
+    if (report.onlyInCurrent.length) notes.push(report.onlyInCurrent.length + ' projeto(s) novo(s) nesta semana (sem SPI anterior para comparar): ' + report.onlyInCurrent.map(reportProjectWithCompany).join(', ') + '.');
+    if (report.onlyInPrevious.length) notes.push(report.onlyInPrevious.length + ' projeto(s) da semana anterior não aparecem nesta semana: ' + report.onlyInPrevious.map(reportProjectWithCompany).join(', ') + '.');
     notesEl.textContent = notes.join(' ');
     notesEl.hidden = !notes.length;
   }
@@ -3459,11 +3463,11 @@ function buildReportText(report){
   }
   if (report.onlyInCurrent.length){
     lines.push('');
-    lines.push('PROJETOS NOVOS NESTA SEMANA (sem SPI anterior): ' + report.onlyInCurrent.map(function(d){ return d.project; }).join(', '));
+    lines.push('PROJETOS NOVOS NESTA SEMANA (sem SPI anterior): ' + report.onlyInCurrent.map(reportProjectWithCompany).join(', '));
   }
   if (report.onlyInPrevious.length){
     lines.push('');
-    lines.push('PROJETOS DA SEMANA ANTERIOR NÃO PRESENTES NESTA SEMANA: ' + report.onlyInPrevious.map(function(d){ return d.project; }).join(', '));
+    lines.push('PROJETOS DA SEMANA ANTERIOR NÃO PRESENTES NESTA SEMANA: ' + report.onlyInPrevious.map(reportProjectWithCompany).join(', '));
   }
   lines.push('');
   lines.push('Gerado em ' + new Date().toLocaleString('pt-BR') + '.');
