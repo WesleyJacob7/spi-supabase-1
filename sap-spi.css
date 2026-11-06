@@ -165,10 +165,10 @@ tr.row-isolated td{ background: var(--sap-accent-soft); }
 .btn.small{ border-radius: 4px; }
 .btn.ghost{ background: transparent; border-color: transparent; }
 .btn.ghost:hover:not(:disabled){ background: var(--sap-accent-soft); border-color: transparent; }
-.btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn.primary{ background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
 .btn.primary:hover:not(:disabled){ background: var(--sap-accent-hover); border-color: var(--sap-accent-hover); filter: none; }
 .btn.danger-outline{ background: var(--surface-1); }
-.btn.danger{ font-weight: 600; }
+.btn.danger{ font-weight: 500; }
 
 /* ---- filtros: seletores e botões segmentados ---- */
 select.wk, textarea.reply-input, .login-field select, .login-field input,
@@ -177,7 +177,7 @@ select.wk, textarea.reply-input, .login-field select, .login-field input,
 }
 .pill{ border-radius: 4px; font-weight: 400; background: var(--surface-1); color: var(--text-secondary); }
 .pill:hover{ background: var(--sap-hover); }
-.pill[aria-pressed="true"]{ background: var(--surface-1); border-color: currentColor; font-weight: 600; box-shadow: inset 0 -2px 0 currentColor; }
+.pill[aria-pressed="true"]{ background: var(--surface-1); border-color: currentColor; font-weight: 500; box-shadow: inset 0 -2px 0 currentColor; }
 .pill[aria-pressed="true"].all{ background: var(--sap-accent-soft); color: var(--accent); border-color: var(--accent); }
 
 /* ---- diálogos ---- */
