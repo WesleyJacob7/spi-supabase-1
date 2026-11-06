@@ -338,6 +338,12 @@ function pad2(n){ return n < 10 ? '0' + n : '' + n; }
 function round4(n){ return Math.round(n * 10000) / 10000; }
 function fmtSpi(v){ return (typeof v === 'number' ? v : 0).toFixed(3).replace('.', ','); }
 function fmtPct(v){ return Math.round((v || 0) * 100) + '%'; }
+// Variação de prazo em dias inteiros, em texto (finish_variance > 0 = atraso; < 0 = adiantamento).
+function fmtPrazo(v){
+  var n = Math.round(Math.abs(Number(v) || 0));
+  if (!n) return 'No prazo';
+  return n + (n === 1 ? ' dia' : ' dias') + (v > 0 ? ' de atraso' : ' de adiantamento');
+}
 function statusOf(spi){ if (spi > 1) return 'good'; if (spi >= 0.85) return 'warn'; return 'crit'; }
 var statusLabel = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
 var statusRange = { good: '> 1,00', warn: '0,85–1,00', crit: '< 0,85' };
@@ -2780,7 +2786,7 @@ function showTooltip(cx, cy, d, pinned){
   var name = document.createElement('div'); name.className = 't-name'; name.textContent = projectLabel(d);
   var sub = document.createElement('div'); sub.className = 't-sub'; sub.textContent = d.company + ' · ' + d.scope;
   tooltip.appendChild(name); tooltip.appendChild(sub);
-  [['% concluído', fmtPct(d.pct_complete)], ['SPI', fmtSpi(d.spi)], ['Status', statusLabel[st]], ['Data de referência', fmtDateMDY(d.date)]].forEach(function(pair){
+  [['% concluído', fmtPct(d.pct_complete)], ['SPI', fmtSpi(d.spi)], ['Status', statusLabel[st]], ['Prazo', fmtPrazo(d.finish_variance)], ['Data de referência', fmtDateMDY(d.date)]].forEach(function(pair){
     var row = document.createElement('div'); row.className = 't-row';
     var key = document.createElement('span'); key.className = 't-key'; key.textContent = pair[0];
     var val = document.createElement('span'); val.className = 't-val'; val.textContent = pair[1];
