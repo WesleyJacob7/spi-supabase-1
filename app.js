@@ -13,6 +13,11 @@ var EMAIL_CC_BY_COMPANY = {
   'Prestige': 'mramos@prestigeconstructiongrp.com'
 };
 
+// Endereços adicionais de CC só para um projeto específico (nome em d.project).
+var EMAIL_CC_BY_PROJECT = {
+  'Swansea Town Offices': ['mwertz@jkaconstructioninc.com']
+};
+
 // Link do painel de acompanhamento de SPI (site de produção) de cada empresa,
 // incluído discretamente no fim do corpo do e-mail.
 var COMPANY_SPI_PANEL = {
@@ -511,17 +516,19 @@ function buildReminderBody(d){
 }
 
 // Monta a lista de CC: sempre os dois endereços fixos, mais o endereço
-// específico da empresa do projeto (JKA ou Prestige), sem duplicar.
-function ccListForCompany(company){
+// específico da empresa do projeto (JKA ou Prestige) e os do próprio projeto,
+// quando houver, sem duplicar.
+function ccListForCompany(company, project){
   var list = EMAIL_CC_ALWAYS.slice();
-  var extra = EMAIL_CC_BY_COMPANY[company];
-  if (extra && list.indexOf(extra) === -1) list.push(extra);
+  [EMAIL_CC_BY_COMPANY[company]].concat(EMAIL_CC_BY_PROJECT[project] || []).forEach(function(extra){
+    if (extra && list.indexOf(extra) === -1) list.push(extra);
+  });
   return list;
 }
 
 function openMailClient(d){
   var to = pmEmailForProject(d.project) || '';
-  var cc = ccListForCompany(d.company).join(',');
+  var cc = ccListForCompany(d.company, d.project).join(',');
   var subject = buildEmailSubject(d);
   var body = buildEmailBody(d);
   var url = 'mailto:' + to + '?cc=' + encodeURIComponent(cc) +
@@ -538,7 +545,7 @@ function openMailClient(d){
 // lembrete (buildReminderSubject/buildReminderBody) em vez do e-mail original.
 function openReminderMailClient(d){
   var to = pmEmailForProject(d.project) || '';
-  var cc = ccListForCompany(d.company).join(',');
+  var cc = ccListForCompany(d.company, d.project).join(',');
   var subject = buildReminderSubject(d);
   var body = buildReminderBody(d);
   var url = 'mailto:' + to + '?cc=' + encodeURIComponent(cc) +
@@ -754,7 +761,7 @@ function openEmailConfirm(d){
   var to = pmEmailForProject(d.project);
   var text = 'Deseja gerar o e-mail de acompanhamento de SPI para ' + projectLabel(d) + '?';
   text += to ? (' Ele será enviado para ' + to + '.') : ' Nenhum e-mail de PM cadastrado para este projeto — o campo "Para" ficará em branco.';
-  text += ' Em cópia: ' + ccListForCompany(d.company).join(', ') + '.';
+  text += ' Em cópia: ' + ccListForCompany(d.company, d.project).join(', ') + '.';
   text += ' O gráfico de histórico de SPI do projeto será copiado para a área de transferência, para você colar (Ctrl+V) no corpo do e-mail antes da assinatura.';
   var textEl = document.getElementById('emailConfirmText');
   if (textEl) textEl.textContent = text;
