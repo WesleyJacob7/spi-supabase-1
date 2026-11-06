@@ -15,7 +15,8 @@ var EMAIL_CC_BY_COMPANY = {
 
 // Endereços adicionais de CC só para um projeto específico (nome em d.project).
 var EMAIL_CC_BY_PROJECT = {
-  'Swansea Town Offices': ['mwertz@jkaconstructioninc.com']
+  'Swansea Town Offices': ['mwertz@jkaconstructioninc.com'],
+  'Riverhead': ['Tbaptista@jkaconstructioninc.com']
 };
 
 // Link do painel de acompanhamento de SPI (site de produção) de cada empresa,
