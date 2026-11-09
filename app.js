@@ -692,12 +692,14 @@ function buildEmailChartSvg(project){
     }).join(' ');
     node('polyline', { points: pointsStr, fill: 'none', stroke: c.textSecondary, 'stroke-width': 2, opacity: 0.55 }, g);
 
+    var showLbl = trendLabelIdx(trendRows);
     trendRows.forEach(function(d, i){
       var cx = trendXScale(i, trendRows.length);
       var cy = tScale(Math.min(Math.max(d.spi, yMin), trendMax));
       var st = statusOf(d.spi);
       var color = st === 'good' ? c.good : st === 'warn' ? c.warnMark : c.crit;
       node('circle', { cx: cx, cy: cy, r: 5, fill: color, stroke: c.bg, 'stroke-width': 2 }, g);
+      if (!showLbl[i]) return;
       var vt = node('text', { x: cx, y: cy - 12, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 600, fill: c.textSecondary }, g);
       vt.textContent = fmtSpi(d.spi);
     });
@@ -2354,6 +2356,22 @@ function yScale(spi){ return M.top + (yMax - spi) / (yMax - yMin) * plotH; }
 var trendMax = yMax;
 function trendYMax(rows){ var mx = 0; (rows || []).forEach(function(d){ if (d.spi > mx) mx = d.spi; }); return Math.max(yMax, Math.ceil((mx + 0.06) * 10) / 10); }
 function tScale(spi){ return M.top + (trendMax - spi) / (trendMax - yMin) * plotH; }
+// com muitas semanas os números em cima dos pontos se sobrepõem: escolhe quais pontos recebem o número —
+// o último sempre, o maior e o menor SPI, e os demais só quando não encostam no número vizinho já mostrado
+function trendLabelIdx(rows){
+  var n = rows.length, keep = {}, pos = [];
+  if (!n) return keep;
+  rows.forEach(function(d, i){ pos.push({ x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, yMin), trendMax)) - 12 }); });
+  var W0 = 30, H0 = 12;   // tamanho aproximado de um número ("1,488" em 9px)
+  var clash = function(a, b){ return Math.abs(pos[a].x - pos[b].x) < W0 && Math.abs(pos[a].y - pos[b].y) < H0; };
+  var hi = 0, lo = 0;
+  rows.forEach(function(d, i){ if (d.spi > rows[hi].spi) hi = i; if (d.spi < rows[lo].spi) lo = i; });
+  var chosen = [];
+  [n - 1, hi, lo].forEach(function(i){ if (chosen.indexOf(i) < 0 && !chosen.some(function(j){ return clash(i, j); })) chosen.push(i); });
+  for (var i = 0; i < n; i++){ if (chosen.indexOf(i) < 0 && !chosen.some(function(j){ return clash(i, j); })) chosen.push(i); }
+  chosen.forEach(function(i){ keep[i] = true; });
+  return keep;
+}
 
 function el(tag, attrs, parent){
   var e = document.createElementNS(SVGNS, tag);
@@ -2480,6 +2498,7 @@ function drawTrendSeries(rows){
   }).join(' ');
   el('polyline', { points: pointsStr, class: 'trend-line' }, svg);
 
+  var showLbl = trendLabelIdx(rows);
   rows.forEach(function(d, i){
     var cx = trendXScale(i, rows.length);
     var cy = tScale(Math.min(Math.max(d.spi, yMin), trendMax));
@@ -2491,6 +2510,7 @@ function drawTrendSeries(rows){
     titleEl.textContent = fmtDateMDY(d.date) + ' — SPI ' + fmtSpi(d.spi) + ' (' + fmtPct(d.pct_complete) + ' concluído)';
     el('circle', { class: 'dot-mark', cx: cx, cy: cy, r: 5, fill: color }, svg);
 
+    if (!showLbl[i]) return;   // o valor continua no balão ao passar o mouse no ponto
     var vt = el('text', { x: cx, y: cy - 12, class: 'trend-point-label', 'text-anchor': 'middle' }, svg);
     vt.textContent = fmtSpi(d.spi);
   });
