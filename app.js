@@ -672,13 +672,15 @@ function buildEmailChartSvg(project){
 
   var ty = tScale(1);
   node('line', { x1: M.left, x2: M.left + plotW, y1: ty, y2: ty, stroke: c.textMuted, 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }, g);
-  var lbl = node('text', { x: M.left + plotW, y: ty - 6, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
-  lbl.textContent = 'Meta / limite bom (SPI = 1,00)';
+  var tp1 = targetLabelPos(trendRows, 1);
+  var lbl = node('text', { x: tp1.x, y: tp1.y, 'text-anchor': tp1.anchor, 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
+  lbl.textContent = TARGET_TEXTS[1];
 
   var ty2 = tScale(0.85);
   node('line', { x1: M.left, x2: M.left + plotW, y1: ty2, y2: ty2, stroke: c.textMuted, 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }, g);
-  var lbl2 = node('text', { x: M.left + plotW, y: ty2 - 6, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
-  lbl2.textContent = 'Limite atenção / crítico (0,85)';
+  var tp2 = targetLabelPos(trendRows, 0.85);
+  var lbl2 = node('text', { x: tp2.x, y: tp2.y, 'text-anchor': tp2.anchor, 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
+  lbl2.textContent = TARGET_TEXTS[0.85];
 
   var xt2 = node('text', { x: M.left + plotW / 2, y: H - 6, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 10, fill: c.textMuted }, g);
   xt2.textContent = 'Data de referência';
@@ -699,8 +701,8 @@ function buildEmailChartSvg(project){
       var st = statusOf(d.spi);
       var color = st === 'good' ? c.good : st === 'warn' ? c.warnMark : c.crit;
       node('circle', { cx: cx, cy: cy, r: 5, fill: color, stroke: c.bg, 'stroke-width': 2 }, g);
-      if (!showLbl[i]) return;
-      var vt = node('text', { x: cx, y: cy - 12, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 600, fill: c.textSecondary }, g);
+      if (showLbl[i] === undefined) return;
+      var vt = node('text', { x: cx, y: cy + showLbl[i], 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 600, fill: c.textSecondary }, g);
       vt.textContent = fmtSpi(d.spi);
     });
   }
@@ -2356,20 +2358,58 @@ function yScale(spi){ return M.top + (yMax - spi) / (yMax - yMin) * plotH; }
 var trendMax = yMax;
 function trendYMax(rows){ var mx = 0; (rows || []).forEach(function(d){ if (d.spi > mx) mx = d.spi; }); return Math.max(yMax, Math.ceil((mx + 0.06) * 10) / 10); }
 function tScale(spi){ return M.top + (trendMax - spi) / (trendMax - yMin) * plotH; }
-// com muitas semanas os números em cima dos pontos se sobrepõem: escolhe quais pontos recebem o número —
-// o último sempre, o maior e o menor SPI, e os demais só quando não encostam no número vizinho já mostrado
+// rótulos das linhas de meta (1,00 e 0,85): ficam no ponto da linha onde não há pontos do gráfico
+// (direita, esquerda ou meio), para os números do SPI não ficarem por cima deles
+var TARGET_TEXTS = { 1: 'Meta / limite bom (SPI = 1,00)', 0.85: 'Limite atenção / crítico (0,85)' };
+function targetLabelPos(rows, val){
+  var n = (rows || []).length, ty = tScale(val), w = TARGET_TEXTS[val].length * 5.2, top = ty - 16, bot = ty - 2;
+  // acima da linha (direita, esquerda, meio) e, se os pontos ocuparem tudo (ex.: SPI = 1,00 por meses), abaixo dela
+  var xs = [{ x: M.left + plotW, anchor: 'end', l: M.left + plotW - w, r: M.left + plotW },
+            { x: M.left + 6, anchor: 'start', l: M.left + 6, r: M.left + 6 + w },
+            { x: M.left + plotW / 2, anchor: 'middle', l: M.left + plotW / 2 - w / 2, r: M.left + plotW / 2 + w / 2 }];
+  var cands = [];
+  [[top, bot, ty - 6], [ty + 7, ty + 18, ty + 16]].forEach(function(v){ xs.forEach(function(c){ cands.push({ x: c.x, anchor: c.anchor, l: c.l, r: c.r, t: v[0], b: v[1], y: v[2] }); }); });
+  var free = function(cd){ for (var i = 0; i < n; i++){ var x = trendXScale(i, n), y = tScale(Math.min(Math.max(rows[i].spi, yMin), trendMax));
+    if (x > cd.l - 7 && x < cd.r + 7 && y > cd.t - 5 && y < cd.b + 5) return false; } return true; };
+  var c = cands.find(free) || cands[0];
+  return { x: c.x, y: c.y, anchor: c.anchor, box: { l: c.l, r: c.r, t: c.t, b: c.b } };
+}
+// com muitas semanas (ou SPI parecidos) os números dos pontos se sobrepõem: escolhe quais pontos recebem o número
+// e onde (acima ou abaixo do ponto) — o último sempre, o maior e o menor SPI, e os demais só quando cabem sem
+// encostar em outro número, nos rótulos das linhas de meta ou nos próprios pontos
 function trendLabelIdx(rows){
-  var n = rows.length, keep = {}, pos = [];
+  var n = rows.length, keep = {};
   if (!n) return keep;
-  rows.forEach(function(d, i){ pos.push({ x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, yMin), trendMax)) - 12 }); });
-  var W0 = 30, H0 = 12;   // tamanho aproximado de um número ("1,488" em 9px)
-  var clash = function(a, b){ return Math.abs(pos[a].x - pos[b].x) < W0 && Math.abs(pos[a].y - pos[b].y) < H0; };
+  var pts = rows.map(function(d, i){ return { x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, yMin), trendMax)) }; });
+  var boxes = [1, 0.85].map(function(v){ return targetLabelPos(rows, v).box; });
+  var W0 = 30, H0 = 11;
+  var boxOf = function(i, dy){ var cy = pts[i].y + dy; return { l: pts[i].x - W0 / 2, r: pts[i].x + W0 / 2, t: cy - H0 + 2, b: cy + 2 }; };
+  var hit = function(a, b){ return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t; };
+  var placed = [];
+  var ok = function(i, bx){
+    if (bx.t < M.top || bx.b > M.top + plotH) return false;
+    if (boxes.some(function(b){ return hit(bx, b); })) return false;
+    if (placed.some(function(p){ return hit(bx, p); })) return false;
+    return true;
+  };
+  var tryPlace = function(i, spaced){
+    if (keep[i] !== undefined) return;
+    // pontos que não são obrigatórios: um número a cada ~35 px na horizontal, para a linha continuar legível
+    if (spaced && placed.some(function(p){ return Math.abs((p.l + p.r) / 2 - pts[i].x) < W0 + 5; })) return;
+    var above = boxOf(i, -12), below = boxOf(i, 19);
+    if (ok(i, above)){ keep[i] = -12; placed.push(above); }
+    else if (ok(i, below)){ keep[i] = 19; placed.push(below); }
+  };
   var hi = 0, lo = 0;
   rows.forEach(function(d, i){ if (d.spi > rows[hi].spi) hi = i; if (d.spi < rows[lo].spi) lo = i; });
-  var chosen = [];
-  [n - 1, hi, lo].forEach(function(i){ if (chosen.indexOf(i) < 0 && !chosen.some(function(j){ return clash(i, j); })) chosen.push(i); });
-  for (var i = 0; i < n; i++){ if (chosen.indexOf(i) < 0 && !chosen.some(function(j){ return clash(i, j); })) chosen.push(i); }
-  chosen.forEach(function(i){ keep[i] = true; });
+  [n - 1, hi, lo].forEach(function(i){ tryPlace(i, false); });
+  // SPI repetido semana após semana: só a primeira semana de cada valor recebe o número
+  var same = function(a, b){ return Math.abs(rows[a].spi - rows[b].spi) < 0.0005; };
+  for (var i = n - 1; i >= 0; i--){
+    if (i > 0 && same(i, i - 1)) continue;
+    var j = i, dup = false; while (j + 1 < n && same(j + 1, i)){ j++; if (keep[j] !== undefined) dup = true; }   // o valor já aparece na mesma sequência
+    if (!dup) tryPlace(i, true);
+  }
   return keep;
 }
 
@@ -2475,13 +2515,15 @@ function buildTrendStaticChart(rows){
 
   var ty = tScale(1);
   el('line', { x1: M.left, x2: M.left + plotW, y1: ty, y2: ty, class: 'spi-target' }, svg);
-  var lbl = el('text', { x: M.left + plotW, y: ty - 6, class: 'spi-target-label', 'text-anchor': 'end' }, svg);
-  lbl.textContent = 'Meta / limite bom (SPI = 1,00)';
+  var tp1 = targetLabelPos(rows, 1);
+  var lbl = el('text', { x: tp1.x, y: tp1.y, class: 'spi-target-label', 'text-anchor': tp1.anchor }, svg);
+  lbl.textContent = TARGET_TEXTS[1];
 
   var ty2 = tScale(0.85);
   el('line', { x1: M.left, x2: M.left + plotW, y1: ty2, y2: ty2, class: 'spi-target' }, svg);
-  var lbl2 = el('text', { x: M.left + plotW, y: ty2 - 6, class: 'spi-target-label', 'text-anchor': 'end' }, svg);
-  lbl2.textContent = 'Limite atenção / crítico (0,85)';
+  var tp2 = targetLabelPos(rows, 0.85);
+  var lbl2 = el('text', { x: tp2.x, y: tp2.y, class: 'spi-target-label', 'text-anchor': tp2.anchor }, svg);
+  lbl2.textContent = TARGET_TEXTS[0.85];
 
   var xt2 = el('text', { x: M.left + plotW / 2, y: H - 6, class: 'axis-label', 'text-anchor': 'middle' }, svg);
   xt2.textContent = 'Data de referência';
@@ -2510,8 +2552,8 @@ function drawTrendSeries(rows){
     titleEl.textContent = fmtDateMDY(d.date) + ' — SPI ' + fmtSpi(d.spi) + ' (' + fmtPct(d.pct_complete) + ' concluído)';
     el('circle', { class: 'dot-mark', cx: cx, cy: cy, r: 5, fill: color }, svg);
 
-    if (!showLbl[i]) return;   // o valor continua no balão ao passar o mouse no ponto
-    var vt = el('text', { x: cx, y: cy - 12, class: 'trend-point-label', 'text-anchor': 'middle' }, svg);
+    if (showLbl[i] === undefined) return;   // o valor continua no balão ao passar o mouse no ponto
+    var vt = el('text', { x: cx, y: cy + showLbl[i], class: 'trend-point-label', 'text-anchor': 'middle' }, svg);
     vt.textContent = fmtSpi(d.spi);
   });
 }
