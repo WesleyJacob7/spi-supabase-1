@@ -4022,8 +4022,8 @@ function renderImpactReport(){
     return;
   }
   var dCls = r.dG < -SPI_EPSILON ? 'crit' : (r.dG > SPI_EPSILON ? 'good' : '');
-  var kpi = function(label, val, cls, sub){ return '<div class="ir-kpi"><div class="ir-kpi-l">' + label + '</div><div class="ir-kpi-v ' + (cls || '') + '">' + val + '</div>' + (sub ? '<div class="ir-kpi-s">' + sub + '</div>' : '') + '</div>'; };
-  h += '<section class="ir-kpis">'
+  var kpi = function(label, val, cls, sub){ return '<div class="kpi"><div class="label">' + label + '</div><div class="value ' + (cls || '') + '">' + val + '</div><div class="sub">' + (sub || '&nbsp;') + '</div></div>'; };
+  h += '<section class="kpis">'
     + kpi('SPI ' + impactEsc(r.prevWeek), fmtSpi(r.Gp), statusOf(r.Gp), impactStatusLabel(r.Gp))
     + kpi('SPI ' + impactEsc(r.week), fmtSpi(r.Gc), statusOf(r.Gc), impactStatusLabel(r.Gc) + ' · ' + r.curCount + ' projeto' + (r.curCount === 1 ? '' : 's'))
     + kpi('Variação', impactSigned(r.dG, 3), dCls, fmtPctChange(r.dG, r.Gp))
@@ -4031,7 +4031,7 @@ function renderImpactReport(){
     + kpi('Recuperados', impactDays(r.recDays) + ' dias', r.recDays < 0 ? 'good' : '', r.recCount + ' projeto' + (r.recCount === 1 ? '' : 's'))
     + kpi('SPI dos projetos', r.worse + (r.worse === 1 ? ' piorou' : ' pioraram'), '', r.better + (r.better === 1 ? ' melhorou' : ' melhoraram'))
     + '</section>';
-  h += '<section class="ir-sec"><h3>O que gerou a variação</h3><div class="ir-summary ' + dCls + '">' + impactSummaryText(r).map(function(p){ return '<p>' + impactEsc(p) + '</p>'; }).join('') + '</div></section>';
+  h += '<section class="ir-sec"><h3>O que gerou a variação</h3><div class="ir-summary ir-lead ' + dCls + '">' + impactSummaryText(r).map(function(p){ return '<p>' + impactEsc(p) + '</p>'; }).join('') + '</div></section>';
   if (r.byCompany && r.byCompany.length > 1){
     h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num">Términos (dias)</th><th class="num">Contribuição no Global</th><th class="num">% da variação</th></tr></thead><tbody>';
     r.byCompany.forEach(function(c){
@@ -4115,8 +4115,10 @@ function fillImpactControls(){
   if (seg){
     seg.innerHTML = '';
     ['Geral'].concat(impactCompanies()).forEach(function(co){
-      var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-company', co); b.textContent = co;
-      b.className = co === impactState.company ? 'active' : '';
+      var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-company', co);
+      b.className = 'pill' + (co === 'Geral' ? ' all' : '');
+      b.innerHTML = '<span class="dot"></span><span>' + impactEsc(co) + '</span>';
+      b.setAttribute('aria-pressed', co === impactState.company ? 'true' : 'false');
       seg.appendChild(b);
     });
   }
@@ -4154,7 +4156,7 @@ function initImpactReport(){
   document.getElementById('impactCompany').addEventListener('click', function(e){
     var b = e.target.closest('button[data-company]'); if (!b) return;
     impactState.company = b.getAttribute('data-company');
-    [].forEach.call(this.querySelectorAll('button'), function(x){ x.classList.toggle('active', x === b); });
+    [].forEach.call(this.querySelectorAll('button'), function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
     renderImpactReport();
   });
   document.addEventListener('keydown', function(e){
