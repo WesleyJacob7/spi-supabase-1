@@ -3910,6 +3910,19 @@ function computeImpact(week, company){
   res.rest = main.slice(top.length);
   res.opposite = res.items.filter(function(i){ return down ? i.impact > EPS : i.impact < -EPS; }).sort(function(a, b){ return Math.abs(b.impact) - Math.abs(a.impact); });
   res.neutral = res.items.filter(function(i){ return Math.abs(i.impact) <= EPS; });
+  // projetos que mais pesam no SPI Global pelo atraso ACUMULADO (não pela variação da semana):
+  // ganho = quanto o Global subiria se o término do projeto voltasse para a baseline (duração do schedule = baseline)
+  res.drag = cur.map(function(d){
+    var b = Number(d.baseline_duration) || 0, sd = Number(d.schedule_duration) || 0, gap = sd - b;
+    if (gap <= 0.005) return null;
+    var it = res.items.filter(function(i){ return i.project === d.project; })[0] || {};
+    return { project: d.project, company: d.company, spi: Number(d.spi), pct: Number(d.pct_complete), gap: gap, dS: it.kind === 'common' ? it.dS : null,
+      gain: Bc / (Sc - gap) - Gc };
+  }).filter(Boolean).sort(function(a, b){ return b.gain - a.gain; });
+  res.dragTotalGap = res.drag.reduce(function(a, x){ return a + x.gap; }, 0);
+  res.dragTop = res.drag.slice(0, 10);
+  var topGap = res.dragTop.reduce(function(a, x){ return a + x.gap; }, 0);
+  res.dragTopGlobal = Sc - topGap > 0 ? Bc / (Sc - topGap) : null;
   if (company === 'Geral'){
     res.byCompany = impactCompanies().map(function(co){
       var list = res.items.filter(function(i){ return i.company === co; });
@@ -4057,6 +4070,27 @@ function renderImpactReport(){
   if (r.opposite.length){
     var oppSum = r.opposite.reduce(function(a, i){ return a + i.impact; }, 0);
     h += '<section class="ir-sec"><h3>' + (r.down ? 'Compensaram parcialmente (puxaram para cima)' : 'Puxaram para baixo') + ' <span class="ir-h-note">' + impactSigned(oppSum, 4) + '</span></h3>' + table(r.opposite, true) + '</section>';
+  }
+  if (r.dragTop && r.dragTop.length){
+    h += '<section class="ir-sec"><h3>Projetos que mais pesam no SPI Global (atraso acumulado) <span class="ir-h-note">' + r.dragTop.length + ' de ' + r.drag.length + ' projetos atrasados · ' + impactDays(r.dragTotalGap) + ' dias de atraso no total</span></h3>'
+      + '<div class="ir-summary"><p>Independente da semana: são os projetos cujo atraso no término (duração do schedule acima da baseline) mais derruba o SPI Global.'
+      + (r.dragTopGlobal !== null ? ' Se estes ' + r.dragTop.length + ' estivessem no prazo, o SPI Global ' + (showCo ? '' : 'de ' + impactEsc(r.company) + ' ') + 'iria de ' + fmtSpi(r.Gc) + ' para ' + fmtSpi(r.dragTopGlobal) + ' (' + impactSigned(r.dragTopGlobal - r.Gc, 3) + ').' : '') + '</p></div>'
+      + '<div class="ir-tw"><table class="ir-table ir-fixed"><colgroup><col style="width:30%"><col style="width:10%"><col style="width:11%"><col style="width:13%"><col style="width:11%"><col style="width:16%"><col style="width:9%"></colgroup><thead><tr><th>Projeto</th><th class="num">SPI</th><th class="num">% avanço</th><th class="num">Atraso no término</th><th class="num">Na semana</th><th class="ir-imp-h">Global sem o atraso</th><th class="num">% do atraso</th></tr></thead><tbody>';
+    var maxG = r.dragTop[0].gain || 1;
+    r.dragTop.forEach(function(x){
+      var w = Math.max(2, Math.round(x.gain / maxG * 100));
+      var wk = x.dS === null ? '<span class="ir-muted">novo</span>' : (Math.abs(x.dS) > 0.005 ? '<span class="' + (x.dS > 0 ? 'crit' : 'good') + '">' + impactDays(x.dS) + ' d</span>' : '0 d');
+      var note = x.pct >= 0.9
+        ? 'Reta final (' + impactPct(x.pct) + '): o atraso já está praticamente consolidado — o peso só sai do Global quando o projeto for encerrado.'
+        : 'Em andamento (' + impactPct(x.pct) + '): recuperar prazo aqui ainda melhora o Global — cada dia recuperado vale cerca de ' + impactSigned(x.gain / x.gap, 4) + '.';
+      h += '<tr class="ir-main"><td><div class="ir-proj">' + impactEsc(x.project) + '</div>' + (showCo ? '<div class="ir-muted">' + impactEsc(x.company) + '</div>' : '') + '</td>'
+        + '<td class="num"><span class="ir-spi ' + statusOf(x.spi) + '">' + fmtSpi(x.spi) + '</span></td><td class="num">' + impactPct(x.pct) + '</td>'
+        + '<td class="num"><span class="crit">' + impactDays(x.gap) + ' d</span></td><td class="num nw">' + wk + '</td>'
+        + '<td class="ir-imp"><div class="ir-bar-wrap"><span class="ir-bar crit" style="width:' + w + '%"></span></div><span class="ir-imp-v crit">' + impactSigned(x.gain, 4) + '</span></td>'
+        + '<td class="num">' + (r.dragTotalGap ? Math.round(x.gap / r.dragTotalGap * 100) + '%' : '—') + '</td></tr>'
+        + '<tr class="ir-diag"><td colspan="7">' + impactEsc(note) + '</td></tr>';
+    });
+    h += '</tbody></table></div><p class="ir-muted" style="margin:6px 0 0">"Global sem o atraso" = quanto o SPI Global subiria só com este projeto no prazo. "Na semana" = quanto o término andou desde a semana anterior.</p></section>';
   }
   if (r.neutral.length){
     h += '<section class="ir-sec"><h3>Sem impacto <span class="ir-h-note">' + r.neutral.length + ' projeto' + (r.neutral.length === 1 ? '' : 's') + '</span></h3><p class="ir-neutral">'
