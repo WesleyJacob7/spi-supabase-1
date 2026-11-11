@@ -654,6 +654,106 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
 }
 </style>
 <link rel="stylesheet" href="sap-spi.css?v=20261106a">
+<style id="impactStyles">
+/* ---------- Análise de impacto no SPI ---------- */
+body.impact-open{ overflow:hidden; }
+.impact-overlay{ position:fixed; inset:0; z-index:1000; background:var(--overlay); display:flex; }
+.impact-overlay[hidden]{ display:none; }
+.impact-shell{ display:flex; flex-direction:column; width:100%; height:100%; background:var(--page-bg); }
+.impact-toolbar{ display:flex; align-items:center; flex-wrap:wrap; gap:10px 14px; padding:10px 20px; background:var(--sap-shell, #354a5f); color:var(--sap-shell-text, #fff); }
+.impact-toolbar-title{ font-weight:700; font-size:15px; margin-right:6px; }
+.impact-field{ display:flex; align-items:center; gap:6px; font-size:13px; }
+.impact-field select{ font:inherit; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,.35); background:var(--surface-1); color:var(--text-primary); }
+.impact-seg{ display:inline-flex; border:1px solid rgba(255,255,255,.35); border-radius:7px; overflow:hidden; }
+.impact-seg button{ font:inherit; font-size:13px; padding:5px 14px; border:0; background:transparent; color:inherit; cursor:pointer; }
+.impact-seg button + button{ border-left:1px solid rgba(255,255,255,.35); }
+.impact-seg button.active{ background:var(--sap-shell-text, #fff); color:var(--sap-shell, #354a5f); font-weight:700; }
+.impact-spacer{ flex:1; }
+.impact-toolbar .btn.ghost{ color:var(--sap-shell-text, #fff); border-color:rgba(255,255,255,.45); background:transparent; }
+.impact-scroll{ flex:1; overflow:auto; padding:24px 16px 48px; }
+.impact-page{ max-width:1080px; margin:0 auto; background:var(--surface-1); color:var(--text-primary); border-radius:10px; box-shadow:var(--shadow); padding:28px 32px; font-size:13px; line-height:1.45; }
+.ir-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:16px; border-bottom:2px solid var(--accent); padding-bottom:12px; margin-bottom:18px; }
+.ir-eyebrow{ font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+.ir-title{ margin:2px 0 4px; font-size:22px; }
+.ir-sub, .ir-gen{ color:var(--text-secondary); font-size:12.5px; }
+.ir-gen{ white-space:nowrap; }
+.ir-kpis{ display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:10px; margin-bottom:20px; }
+.ir-kpi{ border:1px solid var(--border); border-radius:8px; padding:10px 12px; background:var(--surface-2); }
+.ir-kpi-l{ font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); }
+.ir-kpi-v{ font-size:19px; font-weight:700; margin-top:2px; }
+.ir-kpi-s{ font-size:11.5px; color:var(--text-secondary); }
+.ir-sec{ margin-top:22px; }
+.ir-sec h3{ font-size:14.5px; margin:0 0 8px; }
+.ir-h-note{ font-weight:400; color:var(--text-muted); font-size:12.5px; margin-left:6px; }
+.ir-summary{ border-left:4px solid var(--border); background:var(--surface-2); border-radius:0 8px 8px 0; padding:10px 14px; }
+.ir-summary.crit{ border-left-color:var(--status-critical); background:var(--status-critical-wash); }
+.ir-summary.good{ border-left-color:var(--status-good); background:var(--status-good-wash); }
+.ir-summary p{ margin:4px 0; }
+.ir-summary p:first-child{ font-weight:700; font-size:14px; }
+.ir-tw{ overflow-x:auto; }
+.ir-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.ir-table th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted); font-weight:700; padding:7px 8px; border-bottom:1px solid var(--border); background:var(--sap-th-bg, var(--surface-2)); }
+.ir-table td{ padding:7px 8px; vertical-align:top; }
+.ir-table .num{ text-align:right; }
+.ir-table .nw{ white-space:nowrap; }
+.ir-table tr.ir-main td{ border-top:1px solid var(--hairline); }
+.ir-table tr.ir-diag td{ padding-top:0; padding-bottom:10px; color:var(--text-secondary); font-size:12px; }
+.ir-compact td{ border-top:1px solid var(--hairline); }
+.ir-proj{ font-weight:600; }
+.ir-muted{ color:var(--text-muted); font-size:11.5px; }
+.ir-spi{ font-weight:700; }
+.ir-spi.good, .ir-table .good, .ir-kpi-v.good{ color:var(--status-good); }
+.ir-spi.warn, .ir-kpi-v.warn{ color:var(--status-warning-text); }
+.ir-spi.crit, .ir-table .crit, .ir-kpi-v.crit{ color:var(--status-critical); }
+.ir-table.ir-fixed{ table-layout:fixed; min-width:820px; }
+.ir-table th{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ir-proj{ overflow-wrap:anywhere; }
+.ir-imp{ white-space:nowrap; }
+.ir-bar-wrap{ display:inline-block; width:70px; height:8px; background:var(--surface-3); border-radius:4px; vertical-align:middle; margin-right:8px; overflow:hidden; }
+.ir-bar{ display:block; height:100%; border-radius:4px; }
+.ir-bar.crit{ background:var(--status-critical); }
+.ir-bar.good{ background:var(--status-good); }
+.ir-imp-v{ font-weight:700; font-variant-numeric:tabular-nums; }
+.ir-neutral{ color:var(--text-secondary); margin:0; }
+.ir-empty{ color:var(--text-secondary); }
+.ir-foot{ margin-top:26px; padding-top:10px; border-top:1px solid var(--hairline); font-size:11px; color:var(--text-muted); }
+@media (max-width: 900px){ .ir-kpis{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+@media (max-width: 560px){
+  .impact-page{ padding:18px 14px; }
+  .ir-kpis{ grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .ir-head{ flex-direction:column; }
+  .impact-toolbar{ padding:10px 16px; }
+}
+@media print{
+  @page{ size:A4; margin:12mm; }
+  body.printing-impact{ background:#fff !important; overflow:visible !important; }
+  body.printing-impact > *:not(#impactOverlay){ display:none !important; }
+  body.printing-impact #impactOverlay{ position:static; display:block; background:#fff; }
+  body.printing-impact .impact-shell{ display:block; height:auto; background:#fff; }
+  body.printing-impact .impact-toolbar{ display:none !important; }
+  body.printing-impact .impact-scroll{ overflow:visible; padding:0; }
+  body.printing-impact .impact-page{
+    max-width:none; box-shadow:none; border-radius:0; padding:0; font-size:11px;
+    color-scheme:light;
+    --surface-1:#ffffff; --surface-2:#f7f7f7; --surface-3:#eceeef;
+    --text-primary:#32363a; --text-secondary:#515559; --text-muted:#6a6d70;
+    --hairline:#e5e5e5; --border:#d9d9d9; --accent:#0a6ed1; --sap-th-bg:#f2f2f2;
+    --status-good:#107e3e; --status-good-wash:rgba(16,126,62,0.09);
+    --status-warning-text:#b75b00;
+    --status-critical:#bb0000; --status-critical-wash:rgba(187,0,0,0.07);
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  body.printing-impact .ir-kpis{ grid-template-columns:repeat(6, minmax(0,1fr)); }
+  body.printing-impact .ir-tw{ overflow:visible; }
+  body.printing-impact .ir-table{ font-size:10.5px; }
+  body.printing-impact .ir-table.ir-fixed{ min-width:0; }
+  body.printing-impact .ir-bar-wrap{ width:50px; }
+  body.printing-impact tr, body.printing-impact .ir-kpi, body.printing-impact .ir-summary{ break-inside:avoid; }
+  body.printing-impact tr.ir-main{ break-after:avoid; }
+  body.printing-impact .ir-sec h3{ break-after:avoid; }
+}
+</style>
+
 <style>
 /* Painel e E-mails na barra superior */
 .shellbar .view-tabs{ display:flex; align-items:stretch; align-self:stretch; gap:2px; }
@@ -703,6 +803,7 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
         <input type="file" id="importFileInput" accept="application/json" hidden>
         <button type="button" class="btn ghost small" id="btnManageExcluded" title="Projetos excluídos (todas as semanas) ou encerrados (a partir de uma semana)">Projetos excluídos / encerrados</button>
         <button type="button" class="btn ghost small" id="btnWeeklyReport" title="Compara a semana selecionada com a semana anterior">Relatório semanal</button>
+        <button type="button" class="btn ghost small" id="btnImpactReport" title="Mostra quais projetos geraram a variação do SPI Global na semana — visão geral ou por empresa, com exportação em PDF">Análise de impacto</button>
       </div>
       <div class="header-side-row" id="headerAuthRow">
         <span class="logged-in-as" id="loggedInAs"></span>
@@ -1162,6 +1263,20 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
 <datalist id="scopeList"></datalist>
 <datalist id="projectList"></datalist>
 <datalist id="projectCodeList"></datalist>
+
+<div class="impact-overlay" id="impactOverlay" hidden>
+  <div class="impact-shell" role="dialog" aria-modal="true" aria-label="Análise de impacto no SPI">
+    <div class="impact-toolbar">
+      <div class="impact-toolbar-title">Análise de impacto no SPI</div>
+      <label class="impact-field">Semana <select id="impactWeek"></select></label>
+      <div class="impact-seg" id="impactCompany" role="group" aria-label="Empresa"></div>
+      <span class="impact-spacer"></span>
+      <button type="button" class="btn primary small" id="impactPdf" title="Abre a impressão — escolha &quot;Salvar como PDF&quot; como destino">Exportar PDF</button>
+      <button type="button" class="btn ghost small" id="impactClose">Fechar</button>
+    </div>
+    <div class="impact-scroll"><article class="impact-page" id="impactReport"></article></div>
+  </div>
+</div>
 
 <div class="toast-stack" id="toastStack"></div>
 

@@ -3822,6 +3822,313 @@ function initWeeklyReport(){
   });
 }
 
+/* ---------- Análise de impacto no SPI ----------
+   Mostra quais projetos geraram a variação do SPI Global entre a semana escolhida e a anterior.
+   SPI Global = Σ baseline ÷ Σ duração do schedule. A contribuição de cada projeto é
+     ((baseline atual − baseline anterior) − SPI Global anterior × (duração atual − duração anterior)) ÷ Σ duração atual
+   (projeto ausente numa das semanas conta como 0), e a soma das contribuições é exatamente a variação do Global.
+   Visão Geral (todas as empresas) ou por empresa; ignora os filtros do painel e respeita projetos excluídos/encerrados. */
+var IMPACT_WEEK_DAYS = 5; // dias úteis em uma semana de schedule
+var impactState = { week: null, company: 'Geral' };
+function impactEsc(t){ return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function impactNum(v, dec){ return (Math.abs(v) < Math.pow(10, -dec) / 2 ? 0 : v).toFixed(dec).replace('.', ','); }
+function impactSigned(v, dec){ var s = impactNum(Math.abs(v), dec); return (v > 0 && s !== impactNum(0, dec) ? '+' : (v < 0 && s !== impactNum(0, dec) ? '−' : '')) + s; }
+function impactDays(v){ var r = Math.round(v * 10) / 10; return impactSigned(r, r % 1 === 0 ? 0 : 1); }
+function impactPct(v){ return v === null || v === undefined || isNaN(v) ? '—' : Math.round(v * 100) + '%'; }
+function impactStatusLabel(spi){ var s = statusOf(spi); return s === 'good' ? 'Bom' : (s === 'warn' ? 'Atenção' : 'Crítico'); }
+function impactRows(week, company){
+  return DATA.filter(function(d){ return d.week === week && !isHiddenRow(d) && (company === 'Geral' || d.company === company); });
+}
+function impactRefDate(week){
+  var cnt = {}, ref = '';
+  DATA.forEach(function(d){ if (d.week === week && d.date){ cnt[d.date] = (cnt[d.date] || 0) + 1; if (!ref || cnt[d.date] > cnt[ref]) ref = d.date; } });
+  return ref ? fmtDateMDY(ref) : '';
+}
+function impactCompanies(){
+  var set = {};
+  DATA.forEach(function(d){ if (d.company) set[d.company] = true; });
+  return Object.keys(set).sort(function(a, b){ return (reportCompanyRank(a) - reportCompanyRank(b)) || a.localeCompare(b); });
+}
+function computeImpact(week, company){
+  var prevWeek = previousWeekOf(week);
+  var cur = impactRows(week, company);
+  var prev = prevWeek ? impactRows(prevWeek, company) : [];
+  var sum = function(list, k){ return list.reduce(function(a, d){ return a + (Number(d[k]) || 0); }, 0); };
+  var Bp = sum(prev, 'baseline_duration'), Sp = sum(prev, 'schedule_duration');
+  var Bc = sum(cur, 'baseline_duration'), Sc = sum(cur, 'schedule_duration');
+  var Gp = Sp > 0 ? Bp / Sp : null, Gc = Sc > 0 ? Bc / Sc : null;
+  var res = { week: week, prevWeek: prevWeek, company: company, Gp: Gp, Gc: Gc, dG: (Gp !== null && Gc !== null) ? Gc - Gp : null, curCount: cur.length, items: [] };
+  if (res.dG === null) return res;
+  var byP = {}, byC = {};
+  prev.forEach(function(d){ byP[d.project] = d; });
+  cur.forEach(function(d){ byC[d.project] = d; });
+  var names = Object.keys(byP).concat(Object.keys(byC).filter(function(n){ return !byP[n]; }));
+  names.forEach(function(n){
+    var p = byP[n], c = byC[n];
+    var bP = p ? Number(p.baseline_duration) || 0 : 0, sP = p ? Number(p.schedule_duration) || 0 : 0;
+    var bC = c ? Number(c.baseline_duration) || 0 : 0, sC = c ? Number(c.schedule_duration) || 0 : 0;
+    var it = {
+      project: n, company: (c || p).company, kind: !p ? 'new' : (!c ? 'left' : 'common'),
+      spiP: p ? Number(p.spi) : null, spiC: c ? Number(c.spi) : null,
+      pctP: p ? Number(p.pct_complete) : null, pctC: c ? Number(c.pct_complete) : null,
+      bP: bP, bC: bC, sP: sP, sC: sC,
+      dB: (p && c) ? bC - bP : 0, dS: (p && c) ? sC - sP : 0,
+      impact: ((bC - bP) - Gp * (sC - sP)) / Sc
+    };
+    it.dSpi = (p && c) ? it.spiC - it.spiP : null;
+    it.dPP = (p && c) ? Math.round(it.pctC * 100) - Math.round(it.pctP * 100) : null;
+    it.slipImpact = it.kind === 'common' ? -Gp * it.dS / Sc : 0;
+    it.baseImpact = it.kind === 'common' ? it.dB / Sc : 0;
+    it.diag = impactDiagnosis(it, Gp);
+    res.items.push(it);
+  });
+  var common = res.items.filter(function(i){ return i.kind === 'common'; });
+  res.slipDays = common.reduce(function(a, i){ return a + Math.max(i.dS, 0); }, 0);
+  res.recDays = common.reduce(function(a, i){ return a + Math.min(i.dS, 0); }, 0);
+  res.slipCount = common.filter(function(i){ return i.dS > 0.005; }).length;
+  res.recCount = common.filter(function(i){ return i.dS < -0.005; }).length;
+  res.slipPart = common.reduce(function(a, i){ return a + i.slipImpact; }, 0);
+  res.basePart = common.reduce(function(a, i){ return a + i.baseImpact; }, 0);
+  res.changedBase = common.filter(function(i){ return Math.abs(i.dB) > 0.005; });
+  res.entered = res.items.filter(function(i){ return i.kind === 'new'; });
+  res.left = res.items.filter(function(i){ return i.kind === 'left'; });
+  res.compPart = res.entered.concat(res.left).reduce(function(a, i){ return a + i.impact; }, 0);
+  res.worse = common.filter(function(i){ return i.dSpi < -SPI_EPSILON; }).length;
+  res.better = common.filter(function(i){ return i.dSpi > SPI_EPSILON; }).length;
+  // direção principal = a da variação do Global (queda, se praticamente estável)
+  var down = res.dG <= SPI_EPSILON;
+  var EPS = 0.000005;
+  var main = res.items.filter(function(i){ return down ? i.impact < -EPS : i.impact > EPS; }).sort(function(a, b){ return Math.abs(b.impact) - Math.abs(a.impact); });
+  var mainTotal = main.reduce(function(a, i){ return a + i.impact; }, 0);
+  var top = [], acc = 0;
+  main.forEach(function(i){
+    if (top.length < 3 || (top.length < 10 && Math.abs(acc) < Math.abs(mainTotal) * 0.7)){ top.push(i); acc += i.impact; }
+  });
+  res.down = down;
+  res.top = top;
+  res.topShare = Math.abs(res.dG) > EPS ? acc / res.dG : null;
+  res.rest = main.slice(top.length);
+  res.opposite = res.items.filter(function(i){ return down ? i.impact > EPS : i.impact < -EPS; }).sort(function(a, b){ return Math.abs(b.impact) - Math.abs(a.impact); });
+  res.neutral = res.items.filter(function(i){ return Math.abs(i.impact) <= EPS; });
+  if (company === 'Geral'){
+    res.byCompany = impactCompanies().map(function(co){
+      var list = res.items.filter(function(i){ return i.company === co; });
+      if (!list.length) return null;
+      var pc = cur.filter(function(d){ return d.company === co; }), pp = prev.filter(function(d){ return d.company === co; });
+      var s1 = sum(pc, 'schedule_duration'), s0 = sum(pp, 'schedule_duration');
+      return {
+        company: co, count: pc.length,
+        spiP: s0 > 0 ? sum(pp, 'baseline_duration') / s0 : null,
+        spiC: s1 > 0 ? sum(pc, 'baseline_duration') / s1 : null,
+        contrib: list.reduce(function(a, i){ return a + i.impact; }, 0),
+        days: list.reduce(function(a, i){ return a + i.dS; }, 0)
+      };
+    }).filter(Boolean);
+  }
+  return res;
+}
+function impactDiagnosis(it, Gp){
+  if (it.kind === 'new'){
+    return 'Entrou no cálculo nesta semana com SPI ' + fmtSpi(it.spiC) + ', ' + (it.spiC < Gp ? 'abaixo' : 'acima') + ' do SPI Global anterior (' + fmtSpi(Gp) + ') — por isso puxou o Global para ' + (it.impact < 0 ? 'baixo' : 'cima') + '.';
+  }
+  if (it.kind === 'left'){
+    return 'Saiu do cálculo nesta semana (encerrado ou sem lançamento). Tinha SPI ' + fmtSpi(it.spiP) + ', ' + (it.spiP < Gp ? 'abaixo' : 'acima') + ' do Global — sua saída puxou o Global para ' + (it.impact < 0 ? 'baixo' : 'cima') + '.';
+  }
+  var parts = [];
+  var pp = it.dPP, ppTxt = (pp > 0 ? '+' : '') + pp + ' p.p.', days = impactDays(it.dS);
+  if (Math.abs(it.dB) > 0.005){
+    parts.push('Baseline alterada de ' + impactNum(it.bP, it.bP % 1 ? 1 : 0) + ' para ' + impactNum(it.bC, it.bC % 1 ? 1 : 0) + ' dias (' + impactDays(it.dB) + ' dias) — rebaseline ' + (it.dB > 0 ? 'aumenta' : 'reduz') + ' o SPI do projeto.');
+  }
+  if (it.dS > 0.005){
+    if (it.pctC >= 0.9){
+      parts.push('Reta final (' + impactPct(it.pctC) + ' concluído): término reprogramado em ' + days + ' dias' + (it.dS >= IMPACT_WEEK_DAYS - 0.5
+        ? ' — indica que o saldo final (pendências, punch, retrabalho) foi reprogramado, não baixa produção. Vale perguntar ao PM o que está travando o fechamento.'
+        : ' — cauda longa: o fechamento continua se estendendo.'));
+    } else if (it.dS >= IMPACT_WEEK_DAYS - 0.5 && pp <= 1){
+      parts.push('Término empurrou ' + days + ' dias (≈ 1 semana útil) com avanço de ' + ppTxt + ': o schedule ficou praticamente parado — o prazo final deslizou o mesmo tanto que o tempo passou.');
+    } else if (it.bC <= 40 && it.pctC < 0.25){
+      parts.push('Projeto no início (' + impactPct(it.pctC) + '), com baseline curta (' + impactNum(it.bC, 0) + ' dias): ' + days + ' dias já mexem muito no SPI do projeto, mas pesam pouco no Global.');
+    } else if (pp >= 7){
+      parts.push('Avançou bem (' + ppTxt + '), mas abaixo do ritmo que o schedule exigia — o término ainda escorregou ' + days + ' dias.');
+    } else if (it.dS >= IMPACT_WEEK_DAYS - 0.5){
+      parts.push('Término empurrou ' + days + ' dias (≈ 1 semana útil ou mais) com avanço de só ' + ppTxt + '.');
+    } else {
+      parts.push('Término escorregou ' + days + ' dias, com avanço de ' + ppTxt + '.');
+    }
+  } else if (it.dS < -0.005){
+    parts.push('Recuperou ' + impactNum(-it.dS, Math.abs(it.dS) % 1 ? 1 : 0) + ' dias no término' + (pp > 0 ? ', com avanço de ' + ppTxt : '') + '.');
+  } else if (!parts.length){
+    parts.push(pp > 0 ? 'Prazo final mantido; avançou ' + ppTxt + '.' : 'Sem mudança no schedule nem no avanço.');
+  }
+  if (it.spiP !== null && it.spiC !== null && statusOf(it.spiP) !== statusOf(it.spiC)){
+    parts.push('Mudou de faixa: ' + impactStatusLabel(it.spiP) + ' → ' + impactStatusLabel(it.spiC) + '.');
+  }
+  return parts.join(' ').replace(/\.\.(\s|$)/g, '.$1');
+}
+function impactSummaryText(r){
+  var t = [];
+  var dir = r.dG < -SPI_EPSILON ? 'caiu' : (r.dG > SPI_EPSILON ? 'subiu' : 'ficou praticamente estável');
+  t.push('O SPI Global ' + dir + (Math.abs(r.dG) > SPI_EPSILON ? ' de ' + fmtSpi(r.Gp) + ' para ' + fmtSpi(r.Gc) + ' (' + impactSigned(r.dG, 3) + ')' : ' em ' + fmtSpi(r.Gc)) + '.');
+  if (!r.changedBase.length && !r.entered.length && !r.left.length){
+    t.push('Nenhum projeto entrou ou saiu e nenhuma baseline mudou: a variação vem inteira da mudança na duração prevista dos schedules.');
+  } else {
+    var comp = [];
+    comp.push(impactSigned(r.slipPart, 4) + ' de deslocamento de prazo');
+    if (r.changedBase.length) comp.push(impactSigned(r.basePart, 4) + ' de mudança de baseline (' + r.changedBase.map(function(i){ return i.project; }).join(', ') + ')');
+    if (r.entered.length || r.left.length){
+      var who = [];
+      if (r.entered.length) who.push('entraram: ' + r.entered.map(function(i){ return i.project; }).join(', '));
+      if (r.left.length) who.push('saíram: ' + r.left.map(function(i){ return i.project; }).join(', '));
+      comp.push(impactSigned(r.compPart, 4) + ' de projetos que entraram/saíram (' + who.join('; ') + ')');
+    }
+    t.push('Composição da variação: ' + comp.join(', ') + '.');
+  }
+  var net = r.slipDays + r.recDays;
+  t.push('Somando os projetos, os términos empurraram ' + impactDays(r.slipDays) + ' dias (' + r.slipCount + ' projeto' + (r.slipCount === 1 ? '' : 's') + ')'
+    + (r.recCount ? ' e ' + r.recCount + ' projeto' + (r.recCount === 1 ? ' recuperou ' : 's recuperaram ') + impactNum(-r.recDays, Math.abs(r.recDays) % 1 ? 1 : 0) + ' dias' : ' e nenhum projeto recuperou prazo')
+    + ', saldo de ' + impactDays(net) + ' dias na semana.');
+  t.push('Como o SPI Global é Σ baseline ÷ Σ duração do schedule, cada dia de deslocamento pesa igual, seja num projeto grande ou pequeno.');
+  if (r.top.length && r.topShare !== null){
+    t.push((r.top.length === 1 ? 'O projeto abaixo responde' : 'Os ' + r.top.length + ' projetos abaixo respondem') + ' por cerca de ' + Math.round(Math.abs(r.topShare) * 100) + '% da ' + (r.down ? 'queda' : 'alta') + '.');
+  }
+  return t;
+}
+function renderImpactReport(){
+  var box = document.getElementById('impactReport');
+  if (!box) return;
+  var r = computeImpact(impactState.week, impactState.company);
+  var scopeName = impactState.company === 'Geral' ? 'Geral (todas as empresas)' : impactState.company;
+  var showCo = impactState.company === 'Geral';
+  var h = '';
+  h += '<header class="ir-head"><div><div class="ir-eyebrow">Análise de impacto no SPI</div><h2 class="ir-title">' + impactEsc(scopeName) + '</h2>'
+    + '<div class="ir-sub">Semana ' + impactEsc(r.week) + (impactRefDate(r.week) ? ' (' + impactRefDate(r.week) + ')' : '')
+    + (r.prevWeek ? ' comparada com ' + impactEsc(r.prevWeek) + (impactRefDate(r.prevWeek) ? ' (' + impactRefDate(r.prevWeek) + ')' : '') : '') + '</div></div>'
+    + '<div class="ir-gen">Gerado em ' + impactEsc(new Date().toLocaleDateString('pt-BR')) + '</div></header>';
+  if (r.dG === null){
+    box.innerHTML = h + '<p class="ir-empty">' + (r.prevWeek ? 'Não há lançamentos ' + (showCo ? '' : 'de ' + impactEsc(r.company) + ' ') + 'nas duas semanas para comparar.' : 'Não há semana anterior a ' + impactEsc(r.week) + ' para comparar.') + '</p>';
+    return;
+  }
+  var dCls = r.dG < -SPI_EPSILON ? 'crit' : (r.dG > SPI_EPSILON ? 'good' : '');
+  var kpi = function(label, val, cls, sub){ return '<div class="ir-kpi"><div class="ir-kpi-l">' + label + '</div><div class="ir-kpi-v ' + (cls || '') + '">' + val + '</div>' + (sub ? '<div class="ir-kpi-s">' + sub + '</div>' : '') + '</div>'; };
+  h += '<section class="ir-kpis">'
+    + kpi('SPI ' + impactEsc(r.prevWeek), fmtSpi(r.Gp), statusOf(r.Gp), impactStatusLabel(r.Gp))
+    + kpi('SPI ' + impactEsc(r.week), fmtSpi(r.Gc), statusOf(r.Gc), impactStatusLabel(r.Gc) + ' · ' + r.curCount + ' projeto' + (r.curCount === 1 ? '' : 's'))
+    + kpi('Variação', impactSigned(r.dG, 3), dCls, fmtPctChange(r.dG, r.Gp))
+    + kpi('Términos empurrados', impactDays(r.slipDays) + ' dias', r.slipDays > 0 ? 'crit' : '', r.slipCount + ' projeto' + (r.slipCount === 1 ? '' : 's'))
+    + kpi('Recuperados', impactDays(r.recDays) + ' dias', r.recDays < 0 ? 'good' : '', r.recCount + ' projeto' + (r.recCount === 1 ? '' : 's'))
+    + kpi('SPI dos projetos', r.worse + (r.worse === 1 ? ' piorou' : ' pioraram'), '', r.better + (r.better === 1 ? ' melhorou' : ' melhoraram'))
+    + '</section>';
+  h += '<section class="ir-sec"><h3>O que gerou a variação</h3><div class="ir-summary ' + dCls + '">' + impactSummaryText(r).map(function(p){ return '<p>' + impactEsc(p) + '</p>'; }).join('') + '</div></section>';
+  if (r.byCompany && r.byCompany.length > 1){
+    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num">Términos (dias)</th><th class="num">Contribuição no Global</th><th class="num">% da variação</th></tr></thead><tbody>';
+    r.byCompany.forEach(function(c){
+      h += '<tr><td><b>' + impactEsc(c.company) + '</b></td><td class="num">' + c.count + '</td><td class="num">' + (c.spiP !== null ? '<span class="ir-spi ' + statusOf(c.spiP) + '">' + fmtSpi(c.spiP) + '</span>' : '—') + '</td><td class="num">' + (c.spiC !== null ? '<span class="ir-spi ' + statusOf(c.spiC) + '">' + fmtSpi(c.spiC) + '</span>' : '—') + '</td>'
+        + '<td class="num">' + impactDays(c.days) + '</td><td class="num ' + (c.contrib < 0 ? 'crit' : (c.contrib > 0 ? 'good' : '')) + '">' + impactSigned(c.contrib, 4) + '</td><td class="num">' + (Math.abs(r.dG) > 0.000005 ? Math.round(c.contrib / r.dG * 100) + '%' : '—') + '</td></tr>';
+    });
+    h += '</tbody></table></div></section>';
+  }
+  var maxAbs = r.items.reduce(function(a, i){ return Math.max(a, Math.abs(i.impact)); }, 0) || 1;
+  var table = function(list, withDiag){
+    var s = '<div class="ir-tw"><table class="ir-table ir-fixed"><colgroup><col style="width:27%"><col style="width:15%"><col style="width:8%"><col style="width:11%"><col style="width:8%"><col style="width:22%"><col style="width:9%"></colgroup><thead><tr><th>Projeto</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th><th class="ir-imp-h">Impacto no Global</th><th class="num">% da var.</th></tr></thead><tbody>';
+    list.forEach(function(i){
+      var spiTxt = i.kind === 'new' ? '<span class="ir-muted">novo →</span> <span class="ir-spi ' + statusOf(i.spiC) + '">' + fmtSpi(i.spiC) + '</span>'
+        : (i.kind === 'left' ? '<span class="ir-spi ' + statusOf(i.spiP) + '">' + fmtSpi(i.spiP) + '</span> <span class="ir-muted">→ saiu</span>'
+        : fmtSpi(i.spiP) + ' <span class="ir-muted">→</span> <span class="ir-spi ' + statusOf(i.spiC) + '">' + fmtSpi(i.spiC) + '</span>');
+      var dSpi = i.dSpi === null ? '—' : '<span class="' + (i.dSpi < -SPI_EPSILON ? 'crit' : (i.dSpi > SPI_EPSILON ? 'good' : '')) + '">' + impactSigned(i.dSpi, 3) + '</span>';
+      var pct = i.kind === 'common' ? impactPct(i.pctP) + ' → ' + impactPct(i.pctC) + '<div class="ir-muted">' + (i.dPP > 0 ? '+' : '') + i.dPP + ' p.p.</div>' : impactPct(i.kind === 'new' ? i.pctC : i.pctP);
+      var term = i.kind === 'common' ? (Math.abs(i.dS) > 0.005 ? '<span class="' + (i.dS > 0 ? 'crit' : 'good') + '">' + impactDays(i.dS) + ' d</span>' : '0 d') : '—';
+      var w = Math.max(2, Math.round(Math.abs(i.impact) / maxAbs * 100));
+      var share = Math.abs(r.dG) > 0.000005 ? Math.round(i.impact / r.dG * 100) + '%' : '—';
+      s += '<tr class="ir-main"><td><div class="ir-proj">' + impactEsc(i.project) + '</div>' + (showCo ? '<div class="ir-muted">' + impactEsc(i.company) + '</div>' : '') + '</td>'
+        + '<td class="num nw">' + spiTxt + '</td><td class="num">' + dSpi + '</td><td class="num nw">' + pct + '</td><td class="num nw">' + term + '</td>'
+        + '<td class="ir-imp"><div class="ir-bar-wrap"><span class="ir-bar ' + (i.impact < 0 ? 'crit' : 'good') + '" style="width:' + w + '%"></span></div><span class="ir-imp-v ' + (i.impact < 0 ? 'crit' : 'good') + '">' + impactSigned(i.impact, 4) + '</span></td>'
+        + '<td class="num">' + share + '</td></tr>';
+      if (withDiag) s += '<tr class="ir-diag"><td colspan="7">' + impactEsc(i.diag) + '</td></tr>';
+    });
+    return s + '</tbody></table></div>';
+  };
+  if (r.top.length){
+    h += '<section class="ir-sec"><h3>' + (r.down ? 'Projetos que puxaram a queda' : 'Projetos que puxaram a alta') + '</h3>' + table(r.top, true) + '</section>';
+  }
+  if (r.rest.length){
+    var restSum = r.rest.reduce(function(a, i){ return a + i.impact; }, 0);
+    h += '<section class="ir-sec"><h3>Demais projetos ' + (r.down ? 'que puxaram para baixo' : 'que puxaram para cima') + ' <span class="ir-h-note">' + r.rest.length + ' projeto' + (r.rest.length === 1 ? '' : 's') + ' · ' + impactSigned(restSum, 4) + '</span></h3>' + table(r.rest, true) + '</section>';
+  }
+  if (r.opposite.length){
+    var oppSum = r.opposite.reduce(function(a, i){ return a + i.impact; }, 0);
+    h += '<section class="ir-sec"><h3>' + (r.down ? 'Compensaram parcialmente (puxaram para cima)' : 'Puxaram para baixo') + ' <span class="ir-h-note">' + impactSigned(oppSum, 4) + '</span></h3>' + table(r.opposite, true) + '</section>';
+  }
+  if (r.neutral.length){
+    h += '<section class="ir-sec"><h3>Sem impacto <span class="ir-h-note">' + r.neutral.length + ' projeto' + (r.neutral.length === 1 ? '' : 's') + '</span></h3><p class="ir-neutral">'
+      + r.neutral.map(function(i){ return impactEsc(i.project) + ' (' + fmtSpi(i.spiC !== null ? i.spiC : i.spiP) + (i.dPP ? ', ' + (i.dPP > 0 ? '+' : '') + i.dPP + ' p.p.' : '') + ')'; }).join(' · ') + '</p></section>';
+  }
+  h += '<footer class="ir-foot">Impacto no Global = ((baseline atual − anterior) − SPI Global anterior × (duração do schedule atual − anterior)) ÷ Σ duração atual. A soma dos impactos é igual à variação do SPI Global. "Término" = variação da duração prevista no schedule (dias). Considera todos os escopos e ignora projetos excluídos/encerrados.</footer>';
+  box.innerHTML = h;
+}
+function fillImpactControls(){
+  var sel = document.getElementById('impactWeek');
+  if (sel){
+    sel.innerHTML = '';
+    weeks.slice().reverse().forEach(function(w){
+      var o = document.createElement('option'); o.value = w;
+      var ref = impactRefDate(w);
+      o.textContent = w + (ref ? ' (' + ref + ')' : '');
+      sel.appendChild(o);
+    });
+    sel.value = impactState.week;
+  }
+  var seg = document.getElementById('impactCompany');
+  if (seg){
+    seg.innerHTML = '';
+    ['Geral'].concat(impactCompanies()).forEach(function(co){
+      var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-company', co); b.textContent = co;
+      b.className = co === impactState.company ? 'active' : '';
+      seg.appendChild(b);
+    });
+  }
+}
+function openImpactReport(){
+  if (!weeks.length){ showToast('Ainda não há lançamentos para analisar.', 'warn'); return; }
+  impactState.week = (state.week && weeks.indexOf(state.week) !== -1) ? state.week : weeks[weeks.length - 1];
+  fillImpactControls();
+  renderImpactReport();
+  var ov = document.getElementById('impactOverlay');
+  if (ov){ ov.hidden = false; document.body.classList.add('impact-open'); }
+  var sc = document.querySelector('#impactOverlay .impact-scroll'); if (sc) sc.scrollTop = 0;
+}
+function closeImpactReport(){
+  var ov = document.getElementById('impactOverlay');
+  if (ov) ov.hidden = true;
+  document.body.classList.remove('impact-open');
+}
+function printImpactReport(){
+  var oldTitle = document.title;
+  // o título vira o nome sugerido do arquivo PDF
+  document.title = 'Analise de impacto SPI - ' + impactState.company + ' - ' + impactState.week;
+  document.body.classList.add('printing-impact');
+  var done = function(){ document.body.classList.remove('printing-impact'); document.title = oldTitle; window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  setTimeout(function(){ window.print(); setTimeout(done, 1500); }, 50);
+}
+function initImpactReport(){
+  var btn = document.getElementById('btnImpactReport');
+  if (!btn) return;
+  btn.addEventListener('click', openImpactReport);
+  document.getElementById('impactClose').addEventListener('click', closeImpactReport);
+  document.getElementById('impactPdf').addEventListener('click', printImpactReport);
+  document.getElementById('impactWeek').addEventListener('change', function(e){ impactState.week = e.target.value; renderImpactReport(); });
+  document.getElementById('impactCompany').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-company]'); if (!b) return;
+    impactState.company = b.getAttribute('data-company');
+    [].forEach.call(this.querySelectorAll('button'), function(x){ x.classList.toggle('active', x === b); });
+    renderImpactReport();
+  });
+  document.addEventListener('keydown', function(e){
+    var ov = document.getElementById('impactOverlay');
+    if (e.key === 'Escape' && ov && !ov.hidden) closeImpactReport();
+  });
+}
+
 function renderBandBreakdown(rows){
   var tbody = document.getElementById('bandBreakdownBody');
   if (!tbody) return;
@@ -4643,6 +4950,7 @@ async function boot(){
   initFormListeners();
   initExcludedModal();
   initWeeklyReport();
+  initImpactReport();
   updateExcludedButtonLabel();
   render();
   if (isAdminUser()){
