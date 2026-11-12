@@ -3986,13 +3986,13 @@ function impactSummaryText(r){
     t.push('Nenhum projeto entrou ou saiu e nenhuma baseline mudou: a variação vem inteira da mudança na duração prevista dos schedules.');
   } else {
     var comp = [];
-    comp.push(impactSigned(r.slipPart, 4) + ' de deslocamento de prazo');
-    if (r.changedBase.length) comp.push(impactSigned(r.basePart, 4) + ' de mudança de baseline (' + r.changedBase.map(function(i){ return i.project; }).join(', ') + ')');
+    comp.push(impactSigned(r.slipPart, 3) + ' de deslocamento de prazo');
+    if (r.changedBase.length) comp.push(impactSigned(r.basePart, 3) + ' de mudança de baseline (' + r.changedBase.map(function(i){ return i.project; }).join(', ') + ')');
     if (r.entered.length || r.left.length){
       var who = [];
       if (r.entered.length) who.push('entraram: ' + r.entered.map(function(i){ return i.project; }).join(', '));
       if (r.left.length) who.push('saíram: ' + r.left.map(function(i){ return i.project; }).join(', '));
-      comp.push(impactSigned(r.compPart, 4) + ' de projetos que entraram/saíram (' + who.join('; ') + ')');
+      comp.push(impactSigned(r.compPart, 3) + ' de projetos que entraram/saíram (' + who.join('; ') + ')');
     }
     t.push('Composição da variação: ' + comp.join(', ') + '.');
   }
