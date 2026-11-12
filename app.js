@@ -4093,8 +4093,20 @@ function renderImpactReport(){
     h += '</tbody></table></div><p class="ir-muted" style="margin:6px 0 0">"Global sem o atraso" = quanto o SPI Global subiria só com este projeto no prazo. "Na semana" = quanto o término andou desde a semana anterior.</p></section>';
   }
   if (r.neutral.length){
-    h += '<section class="ir-sec"><h3>Sem impacto <span class="ir-h-note">' + r.neutral.length + ' projeto' + (r.neutral.length === 1 ? '' : 's') + '</span></h3><p class="ir-neutral">'
-      + r.neutral.map(function(i){ return impactEsc(i.project) + ' (' + fmtSpi(i.spiC !== null ? i.spiC : i.spiP) + (i.dPP ? ', ' + (i.dPP > 0 ? '+' : '') + i.dPP + ' p.p.' : '') + ')'; }).join(' · ') + '</p></section>';
+    // projetos cujo término e baseline não mudaram desde a semana anterior: não mexeram na VARIAÇÃO do Global nesta semana,
+    // mas os que já estão atrasados continuam pesando no nível do Global (quadro de atraso acumulado acima)
+    var dragBy = {}; (r.drag || []).forEach(function(x){ dragBy[x.project] = x; });
+    var nLate = r.neutral.filter(function(i){ return dragBy[i.project]; }).length;
+    h += '<section class="ir-sec"><h3>Sem variação na semana <span class="ir-h-note">' + r.neutral.length + ' projeto' + (r.neutral.length === 1 ? '' : 's') + '</span></h3>'
+      + '<div class="ir-summary"><p>O término previsto e a baseline destes projetos não mudaram desde a semana anterior, então eles não contribuíram para a variação do SPI Global '
+      + (r.down ? '(nem para a queda, nem para a alta)' : '(nem para a alta, nem para a queda)') + '. Isso não significa que estejam no prazo'
+      + (nLate ? ': ' + (nLate === 1 ? 'o que está marcado com atraso continua' : 'os ' + nLate + ' marcados com atraso continuam') + ' pesando no SPI Global pelo atraso acumulado (quadro acima).' : '.') + '</p></div>'
+      + '<p class="ir-neutral">'
+      + r.neutral.map(function(i){
+          var d = dragBy[i.project];
+          return '<b>' + impactEsc(i.project) + '</b> (SPI ' + fmtSpi(i.spiC !== null ? i.spiC : i.spiP) + (i.dPP ? ', ' + (i.dPP > 0 ? '+' : '') + i.dPP + ' p.p. de avanço' : '')
+            + (d ? ', <span class="crit">' + String(impactDays(d.gap)).replace(/^\+/, '') + ' d de atraso acumulado</span>' : '') + ')';
+        }).join(' · ') + '</p></section>';
   }
   h += '<footer class="ir-foot">Impacto no Global = ((baseline atual − anterior) − SPI Global anterior × (duração do schedule atual − anterior)) ÷ Σ duração atual. A soma dos impactos é igual à variação do SPI Global. "Término" = variação da duração prevista no schedule (dias). Considera todos os escopos e ignora projetos excluídos/encerrados.</footer>';
   box.innerHTML = h;
