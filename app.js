@@ -3992,7 +3992,7 @@ function impactSummaryText(r){
       var who = [];
       if (r.entered.length) who.push('entraram: ' + r.entered.map(function(i){ return i.project; }).join(', '));
       if (r.left.length) who.push('saíram: ' + r.left.map(function(i){ return i.project; }).join(', '));
-      comp.push(impactSigned(r.compPart, 3) + ' de projetos que entraram/saíram (' + who.join('; ') + ')');
+      comp.push(impactSigned(r.compPart, 4) + ' de projetos que entraram/saíram (' + who.join('; ') + ')');
     }
     t.push('Composição da variação: ' + comp.join(', ') + '.');
   }
