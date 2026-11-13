@@ -3978,7 +3978,7 @@ function impactDiagnosis(it, Gp){
       parts.push('Término escorregou ' + days + ' dias, com avanço de ' + ppTxt + '.');
     }
   } else if (it.dS < -0.005){
-    parts.push('Recuperou ' + impactNum(-it.dS, Math.abs(it.dS) % 1 ? 1 : 0) + ' dias no término' + (pp > 0 ? ', com avanço de ' + ppTxt : '') + '.');
+    parts.push('Recuperou ' + impactNum(-it.dS, Math.abs(it.dS) % 1 ? 1 : 0) + (Math.abs(it.dS + 1) < 0.005 ? ' dia' : ' dias') + ' no término' + (pp > 0 ? ', com avanço de ' + ppTxt : '') + '.');
   } else if (!parts.length){
     parts.push(pp > 0 ? 'Prazo final mantido; avançou ' + ppTxt + '.' : 'Sem mudança no schedule nem no avanço.');
   }
