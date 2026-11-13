@@ -4080,8 +4080,8 @@ function renderImpactReport(){
     h += '</section>';
   }
   var maxAbs = r.items.reduce(function(a, i){ return Math.max(a, Math.abs(i.impact)); }, 0) || 1;
-  var table = function(list, withDiag){
-    var s = '<div class="ir-tw"><table class="ir-table ir-fixed"><colgroup><col style="width:27%"><col style="width:15%"><col style="width:8%"><col style="width:11%"><col style="width:8%"><col style="width:22%"><col style="width:9%"></colgroup><thead><tr><th>Projeto</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th><th class="ir-imp-h">Impacto no Global</th><th class="num">% da var.</th></tr></thead><tbody>';
+  var table = function(list, withDiag, opp){
+    var s = '<div class="ir-tw"><table class="ir-table ir-fixed"><colgroup><col style="width:27%"><col style="width:15%"><col style="width:8%"><col style="width:11%"><col style="width:8%">' + (opp ? '<col style="width:17%"><col style="width:14%">' : '<col style="width:22%"><col style="width:9%">') + '</colgroup><thead><tr><th>Projeto</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th><th class="ir-imp-h">Impacto no Global</th><th class="num">' + (opp ? 'Compensou' : '% da var.') + '</th></tr></thead><tbody>';
     list.forEach(function(i){
       var spiTxt = i.kind === 'new' ? '<span class="ir-muted">novo →</span> <span class="ir-spi ' + statusOf(i.spiC) + '">' + fmtSpi(i.spiC) + '</span>'
         : (i.kind === 'left' ? '<span class="ir-spi ' + statusOf(i.spiP) + '">' + fmtSpi(i.spiP) + '</span> <span class="ir-muted">→ saiu</span>'
@@ -4090,11 +4090,11 @@ function renderImpactReport(){
       var pct = i.kind === 'common' ? impactPct(i.pctP) + ' → ' + impactPct(i.pctC) + '<div class="ir-muted">' + (i.dPP > 0 ? '+' : '') + i.dPP + ' p.p.</div>' : impactPct(i.kind === 'new' ? i.pctC : i.pctP);
       var term = i.kind === 'common' ? (Math.abs(i.dS) > 0.005 ? '<span class="' + (i.dS > 0 ? 'crit' : 'good') + '">' + impactDays(i.dS) + ' d</span>' : '0 d') : '—';
       var w = Math.max(2, Math.round(Math.abs(i.impact) / maxAbs * 100));
-      var share = Math.abs(r.dG) > 0.000005 ? Math.round(i.impact / r.dG * 100) + '%' : '—';
+      var share = Math.abs(r.dG) > 0.000005 ? (opp ? Math.abs(Math.round(i.impact / r.dG * 100)) + '% da ' + (r.down ? 'queda' : 'alta') : Math.round(i.impact / r.dG * 100) + '%') : '—';
       s += '<tr class="ir-main"><td><div class="ir-proj">' + impactEsc(i.project) + '</div>' + (showCo ? '<div class="ir-muted">' + impactEsc(i.company) + '</div>' : '') + '</td>'
         + '<td class="num nw">' + spiTxt + '</td><td class="num">' + dSpi + '</td><td class="num nw">' + pct + '</td><td class="num nw">' + term + '</td>'
         + '<td class="ir-imp"><div class="ir-bar-wrap"><span class="ir-bar ' + (i.impact < 0 ? 'crit' : 'good') + '" style="width:' + w + '%"></span></div><span class="ir-imp-v ' + (i.impact < 0 ? 'crit' : 'good') + '">' + impactSigned(i.impact, 4) + '</span></td>'
-        + '<td class="num">' + share + '</td></tr>';
+        + '<td class="num' + (opp ? ' nw' : '') + '">' + share + '</td></tr>';
       if (withDiag) s += '<tr class="ir-diag"><td colspan="7">' + impactEsc(i.diag) + '</td></tr>';
     });
     return s + '</tbody></table></div>';
@@ -4108,7 +4108,7 @@ function renderImpactReport(){
   }
   if (r.opposite.length){
     var oppSum = r.opposite.reduce(function(a, i){ return a + i.impact; }, 0);
-    h += '<section class="ir-sec"><h3>' + (r.down ? 'Compensaram parcialmente (puxaram para cima)' : 'Puxaram para baixo') + ' <span class="ir-h-note">' + impactSigned(oppSum, 4) + '</span></h3>' + table(r.opposite, true) + '</section>';
+    h += '<section class="ir-sec"><h3>' + (r.down ? 'Compensaram parcialmente (puxaram para cima)' : 'Puxaram para baixo') + ' <span class="ir-h-note">' + impactSigned(oppSum, 4) + ' · sem eles, o Global teria ' + (r.down ? 'caído ' : 'subido ') + impactSigned(r.dG - oppSum, 3) + ' em vez de ' + impactSigned(r.dG, 3) + '</span></h3>' + table(r.opposite, true, true) + '</section>';
   }
   if (r.dragTop && r.dragTop.length){
     h += '<section class="ir-sec"><h3>Projetos que mais pesam no SPI Global (atraso acumulado) <span class="ir-h-note">' + r.dragTop.length + ' de ' + r.drag.length + ' projetos atrasados · ' + impactDays(r.dragTotalGap) + ' dias de atraso no total</span></h3>'
