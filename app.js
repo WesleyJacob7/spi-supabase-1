@@ -3904,7 +3904,9 @@ function computeImpact(week, company){
   });
   res.bandCount = ['good', 'warn', 'crit'].map(function(k){
     return { key: k, prev: prev.filter(function(d){ return statusOf(Number(d.spi)) === k; }).length, cur: cur.filter(function(d){ return statusOf(Number(d.spi)) === k; }).length,
-      inn: res.bandChanges.filter(function(i){ return i.bandTo === k; }).length, out: res.bandChanges.filter(function(i){ return i.bandFrom === k; }).length };
+      inn: res.bandChanges.filter(function(i){ return i.bandTo === k; }).length, out: res.bandChanges.filter(function(i){ return i.bandFrom === k; }).length,
+      newP: res.entered.filter(function(i){ return statusOf(i.spiC) === k; }).map(function(i){ return i.project; }),
+      endP: res.left.filter(function(i){ return statusOf(i.spiP) === k; }).map(function(i){ return i.project; }) };
   });
   res.worse = common.filter(function(i){ return i.dSpi < -SPI_EPSILON; }).length;
   res.better = common.filter(function(i){ return i.dSpi > SPI_EPSILON; }).length;
@@ -4066,13 +4068,17 @@ function renderImpactReport(){
     var bandLbl = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
     var bandTag = function(k){ return '<span class="ir-spi ' + k + '">' + bandLbl[k] + '</span>'; };
     h += '<section class="ir-sec"><h3>Mudanças de faixa <span class="ir-h-note">' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? '' : 's') + '</span></h3>';
-    h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Faixa</th><th class="num">' + impactEsc(r.prevWeek) + '</th><th class="num">' + impactEsc(r.week) + '</th><th class="num">Entraram</th><th class="num">Saíram</th></tr></thead><tbody>';
+    h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Faixa</th><th class="num">' + impactEsc(r.prevWeek) + '</th><th class="num">' + impactEsc(r.week) + '</th><th class="num">Entraram</th><th class="num">Saíram</th><th>Novos / encerrados</th></tr></thead><tbody>';
     r.bandCount.forEach(function(c){
       var d = c.cur - c.prev;
       h += '<tr><td>' + bandTag(c.key) + '</td><td class="num">' + c.prev + '</td><td class="num"><b>' + c.cur + '</b>' + (d ? ' <span class="ir-muted">(' + (d > 0 ? '+' : '−') + Math.abs(d) + ')</span>' : '') + '</td>'
-        + '<td class="num">' + (c.inn || '—') + '</td><td class="num">' + (c.out || '—') + '</td></tr>';
+        + '<td class="num">' + (c.inn ? '+' + c.inn : '—') + '</td><td class="num">' + (c.out ? '−' + c.out : '—') + '</td>'
+        + '<td>' + (c.newP.length || c.endP.length
+          ? c.newP.map(function(n){ return '<div><span class="good">+1</span> ' + impactEsc(n) + ' <span class="ir-muted">(novo)</span></div>'; }).join('')
+            + c.endP.map(function(n){ return '<div><span class="crit">−1</span> ' + impactEsc(n) + ' <span class="ir-muted">(encerrado / sem lançamento)</span></div>'; }).join('')
+          : '<span class="ir-muted">—</span>') + '</td></tr>';
     });
-    h += '</tbody></table></div>' + ((r.entered.length || r.left.length) ? '<p class="ir-muted" style="margin:6px 0 10px">Entraram/saíram contam só projetos presentes nas duas semanas; a diferença restante na contagem vem de projetos que entraram ou saíram do cálculo.</p>' : '<div style="height:10px"></div>');
+    h += '</tbody></table></div><p class="ir-muted" style="margin:6px 0 10px">Semana ' + impactEsc(r.prevWeek) + ' + Entraram − Saíram ± Novos/encerrados = semana ' + impactEsc(r.week) + '. "Entraram" e "Saíram" = projetos que mudaram de faixa; "Novos/encerrados" = projetos que entraram ou saíram do cálculo.</p>';
     if (r.bandChanges.length){
       h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Projeto</th><th>Mudança</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th></tr></thead><tbody>';
       r.bandChanges.forEach(function(i){
