@@ -3893,6 +3893,19 @@ function computeImpact(week, company){
   res.entered = res.items.filter(function(i){ return i.kind === 'new'; });
   res.left = res.items.filter(function(i){ return i.kind === 'left'; });
   res.compPart = res.entered.concat(res.left).reduce(function(a, i){ return a + i.impact; }, 0);
+  // mudanças de faixa (Bom / Atenção / Crítico) entre as duas semanas, só projetos presentes nas duas
+  var bandRank = { good: 0, warn: 1, crit: 2 };
+  res.bandChanges = common.filter(function(i){ return statusOf(i.spiP) !== statusOf(i.spiC); }).map(function(i){
+    i.bandFrom = statusOf(i.spiP); i.bandTo = statusOf(i.spiC); i.bandDir = bandRank[i.bandTo] - bandRank[i.bandFrom];
+    return i;
+  }).sort(function(x, y){
+    var wx = x.bandDir > 0 ? 0 : 1, wy = y.bandDir > 0 ? 0 : 1;
+    return (wx - wy) || (wx === 0 ? (bandRank[y.bandTo] - bandRank[x.bandTo]) || (y.bandDir - x.bandDir) : (bandRank[x.bandTo] - bandRank[y.bandTo]) || (x.bandDir - y.bandDir)) || (x.dSpi - y.dSpi) || x.project.localeCompare(y.project);
+  });
+  res.bandCount = ['good', 'warn', 'crit'].map(function(k){
+    return { key: k, prev: prev.filter(function(d){ return statusOf(Number(d.spi)) === k; }).length, cur: cur.filter(function(d){ return statusOf(Number(d.spi)) === k; }).length,
+      inn: res.bandChanges.filter(function(i){ return i.bandTo === k; }).length, out: res.bandChanges.filter(function(i){ return i.bandFrom === k; }).length };
+  });
   res.worse = common.filter(function(i){ return i.dSpi < -SPI_EPSILON; }).length;
   res.better = common.filter(function(i){ return i.dSpi > SPI_EPSILON; }).length;
   // direção principal = a da variação do Global (queda, se praticamente estável)
@@ -4001,6 +4014,15 @@ function impactSummaryText(r){
     + (r.recCount ? ' e ' + r.recCount + ' projeto' + (r.recCount === 1 ? ' recuperou ' : 's recuperaram ') + impactNum(-r.recDays, Math.abs(r.recDays) % 1 ? 1 : 0) + ' dias' : ' e nenhum projeto recuperou prazo')
     + ', saldo de ' + impactDays(net) + ' dias na semana.');
   t.push('Como o SPI Global é Σ baseline ÷ Σ duração do schedule, cada dia de deslocamento pesa igual, seja num projeto grande ou pequeno.');
+  if (r.bandChanges && r.bandChanges.length){
+    var nW = r.bandChanges.filter(function(i){ return i.bandDir > 0; }).length, nB = r.bandChanges.length - nW;
+    var toCrit = r.bandChanges.filter(function(i){ return i.bandTo === 'crit'; }).map(function(i){ return i.project; });
+    t.push('Mudança de faixa: ' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? ' mudou' : 's mudaram') + ' de faixa'
+      + ' (' + nW + ' para pior, ' + nB + ' para melhor)'
+      + (toCrit.length ? '; ' + (toCrit.length === 1 ? 'entrou' : 'entraram') + ' no Crítico: ' + toCrit.join(', ') : '') + '.');
+  } else {
+    t.push('Nenhum projeto mudou de faixa (Bom / Atenção / Crítico) em relação à semana anterior.');
+  }
   if (r.top.length && r.topShare !== null){
     t.push((r.top.length === 1 ? 'O projeto abaixo responde' : 'Os ' + r.top.length + ' projetos abaixo respondem') + ' por cerca de ' + Math.round(Math.abs(r.topShare) * 100) + '% da ' + (r.down ? 'queda' : 'alta') + '.');
   }
@@ -4039,6 +4061,34 @@ function renderImpactReport(){
         + '<td class="num">' + impactDays(c.days) + '</td><td class="num ' + (c.contrib < 0 ? 'crit' : (c.contrib > 0 ? 'good' : '')) + '">' + impactSigned(c.contrib, 4) + '</td><td class="num">' + (Math.abs(r.dG) > 0.000005 ? Math.round(c.contrib / r.dG * 100) + '%' : '—') + '</td></tr>';
     });
     h += '</tbody></table></div></section>';
+  }
+  if (r.bandChanges){
+    var bandLbl = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
+    var bandTag = function(k){ return '<span class="ir-spi ' + k + '">' + bandLbl[k] + '</span>'; };
+    h += '<section class="ir-sec"><h3>Mudanças de faixa <span class="ir-h-note">' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? '' : 's') + '</span></h3>';
+    h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Faixa</th><th class="num">' + impactEsc(r.prevWeek) + '</th><th class="num">' + impactEsc(r.week) + '</th><th class="num">Entraram</th><th class="num">Saíram</th></tr></thead><tbody>';
+    r.bandCount.forEach(function(c){
+      var d = c.cur - c.prev;
+      h += '<tr><td>' + bandTag(c.key) + '</td><td class="num">' + c.prev + '</td><td class="num"><b>' + c.cur + '</b>' + (d ? ' <span class="ir-muted">(' + (d > 0 ? '+' : '−') + Math.abs(d) + ')</span>' : '') + '</td>'
+        + '<td class="num">' + (c.inn || '—') + '</td><td class="num">' + (c.out || '—') + '</td></tr>';
+    });
+    h += '</tbody></table></div>' + ((r.entered.length || r.left.length) ? '<p class="ir-muted" style="margin:6px 0 10px">Entraram/saíram contam só projetos presentes nas duas semanas; a diferença restante na contagem vem de projetos que entraram ou saíram do cálculo.</p>' : '<div style="height:10px"></div>');
+    if (r.bandChanges.length){
+      h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Projeto</th><th>Mudança</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th></tr></thead><tbody>';
+      r.bandChanges.forEach(function(i){
+        var worse = i.bandDir > 0;
+        var term = Math.abs(i.dS) > 0.005 ? '<span class="' + (i.dS > 0 ? 'crit' : 'good') + '">' + impactDays(i.dS) + ' d</span>' : '0 d';
+        h += '<tr><td><div class="ir-proj">' + impactEsc(i.project) + '</div>' + (showCo ? '<div class="ir-muted">' + impactEsc(i.company) + '</div>' : '') + '</td>'
+          + '<td class="nw">' + bandTag(i.bandFrom) + ' <span class="ir-muted">→</span> ' + bandTag(i.bandTo) + ' <span class="' + (worse ? 'crit' : 'good') + '">' + (worse ? '▼ piorou' : '▲ melhorou') + '</span></td>'
+          + '<td class="num nw">' + fmtSpi(i.spiP) + ' <span class="ir-muted">→</span> ' + fmtSpi(i.spiC) + '</td>'
+          + '<td class="num"><span class="' + (i.dSpi < 0 ? 'crit' : 'good') + '">' + impactSigned(i.dSpi, 3) + '</span></td>'
+          + '<td class="num nw">' + impactPct(i.pctP) + ' → ' + impactPct(i.pctC) + '</td><td class="num nw">' + term + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    } else {
+      h += '<p class="ir-empty">Nenhum projeto mudou de faixa em relação à semana anterior.</p>';
+    }
+    h += '</section>';
   }
   var maxAbs = r.items.reduce(function(a, i){ return Math.max(a, Math.abs(i.impact)); }, 0) || 1;
   var table = function(list, withDiag){
