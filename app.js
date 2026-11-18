@@ -4500,7 +4500,7 @@ var bdOpen = { band: null, company: null };
 function ensureBdCss(){
   if (document.getElementById('bdListCss')) return;
   var st = document.createElement('style'); st.id = 'bdListCss';
-  st.textContent = '.bd-count{ font:inherit; font-weight:600; color: var(--accent, var(--text-primary)); background:none; border:none; padding:1px 4px; margin:-1px -4px; border-radius:4px; cursor:pointer; text-decoration: underline dotted; text-underline-offset:3px; }'
+  st.textContent = '.bd-count{ font:inherit; font-weight:600; color: var(--accent, var(--text-primary)); background:none; border:none; padding:1px 4px; margin:-1px -4px; border-radius:4px; cursor:pointer; text-decoration:none; }'
     + '.bd-count:hover, .bd-count[aria-expanded="true"]{ background: var(--surface-2, rgba(127,127,127,.12)); text-decoration:none; }'
     + '.bd-count[disabled]{ cursor:default; text-decoration:none; color:inherit; opacity:.6; }'
     + 'tr.bd-list-row > td{ padding:0 0 8px !important; border-top:none !important; }'
