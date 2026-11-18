@@ -4329,35 +4329,6 @@ function renderImpactReport(){
     + kpi('SPI dos projetos', r.worse + (r.worse === 1 ? ' piorou' : ' pioraram'), '', r.better + (r.better === 1 ? ' melhorou' : ' melhoraram'))
     + '</section>';
   h += '<section class="ir-sec"><h3>O que gerou a variação</h3><div class="ir-summary ir-lead ' + dCls + '">' + impactSummaryText(r).map(function(p){ return '<p>' + impactEsc(p) + '</p>'; }).join('') + '</div></section>';
-  if (r.byCompany && r.byCompany.length > 1){
-    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num">Términos (dias)</th></tr></thead><tbody>';
-    r.byCompany.forEach(function(c){
-      h += '<tr><td><b>' + impactEsc(c.company) + '</b></td><td class="num">' + c.count + '</td><td class="num">' + (c.spiP !== null ? '<span class="ir-spi ' + statusOf(c.spiP) + '">' + fmtSpi(c.spiP) + '</span>' : '—') + '</td><td class="num">' + (c.spiC !== null ? '<span class="ir-spi ' + statusOf(c.spiC) + '">' + fmtSpi(c.spiC) + '</span>' : '—') + '</td>'
-        + '<td class="num">' + impactDays(c.days) + '</td></tr>';
-    });
-    h += '</tbody></table></div></section>';
-  }
-  if (r.bandChanges){
-    var bandLbl = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
-    var bandTag = function(k){ return '<span class="ir-spi ' + k + '">' + bandLbl[k] + '</span>'; };
-    h += '<section class="ir-sec"><h3>Mudanças de status <span class="ir-h-note">' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? '' : 's') + '</span></h3>';
-    if (r.bandChanges.length){
-      h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Projeto</th><th>Mudança</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th></tr></thead><tbody>';
-      r.bandChanges.forEach(function(i){
-        var worse = i.bandDir > 0;
-        var term = Math.abs(i.dS) > 0.005 ? '<span class="' + (i.dS > 0 ? 'crit' : 'good') + '">' + impactDays(i.dS) + ' d</span>' : '0 d';
-        h += '<tr><td><div class="ir-proj">' + impactEsc(i.project) + '</div>' + (showCo ? '<div class="ir-muted">' + impactEsc(i.company) + '</div>' : '') + '</td>'
-          + '<td class="nw">' + bandTag(i.bandFrom) + ' <span class="ir-muted">→</span> ' + bandTag(i.bandTo) + ' <span class="' + (worse ? 'crit' : 'good') + '">' + (worse ? '▼ piorou' : '▲ melhorou') + '</span></td>'
-          + '<td class="num nw">' + fmtSpi(i.spiP) + ' <span class="ir-muted">→</span> ' + fmtSpi(i.spiC) + '</td>'
-          + '<td class="num"><span class="' + (i.dSpi < 0 ? 'crit' : 'good') + '">' + impactSigned(i.dSpi, 3) + '</span></td>'
-          + '<td class="num nw">' + impactPct(i.pctP) + ' → ' + impactPct(i.pctC) + '</td><td class="num nw">' + term + '</td></tr>';
-      });
-      h += '</tbody></table></div>';
-    } else {
-      h += '<p class="ir-empty">Nenhum projeto mudou de status em relação à semana anterior.</p>';
-    }
-    h += '</section>';
-  }
   var maxAbs = r.items.reduce(function(a, i){ return Math.max(a, Math.abs(i.impact)); }, 0) || 1;
   var table = function(list, withDiag, opp){
     var s = '<div class="ir-tw"><table class="ir-table ir-fixed"><colgroup><col style="width:27%"><col style="width:15%"><col style="width:8%"><col style="width:11%"><col style="width:8%">' + (opp ? '<col style="width:17%"><col style="width:14%">' : '<col style="width:22%"><col style="width:9%">') + '</colgroup><thead><tr><th>Projeto</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th><th class="ir-imp-h">Impacto no Global</th><th class="num">' + (opp ? 'Compensou' : '% da ' + (r.down ? 'queda' : 'alta')) + '</th></tr></thead><tbody>';
@@ -4388,6 +4359,35 @@ function renderImpactReport(){
   if (r.opposite.length){
     var oppSum = r.opposite.reduce(function(a, i){ return a + i.impact; }, 0);
     h += '<section class="ir-sec"><h3>' + (r.down ? 'Compensaram parcialmente (puxaram para cima)' : 'Puxaram para baixo') + ' <span class="ir-h-note">' + impactSigned(oppSum, 4) + (Math.abs(r.gross) > 0.000005 ? ' · compensaram ' + Math.abs(Math.round(oppSum / r.gross * 100)) + '% da ' + (r.down ? 'queda' : 'alta') + ': sem eles, o Global teria ' + (r.down ? 'caído ' : 'subido ') + impactSigned(r.gross, 3) + ' em vez de ' + impactSigned(r.dG, 3) : '') + '</span></h3>' + table(r.opposite, true, true) + '</section>';
+  }
+  if (r.byCompany && r.byCompany.length > 1){
+    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num">Términos (dias)</th></tr></thead><tbody>';
+    r.byCompany.forEach(function(c){
+      h += '<tr><td><b>' + impactEsc(c.company) + '</b></td><td class="num">' + c.count + '</td><td class="num">' + (c.spiP !== null ? '<span class="ir-spi ' + statusOf(c.spiP) + '">' + fmtSpi(c.spiP) + '</span>' : '—') + '</td><td class="num">' + (c.spiC !== null ? '<span class="ir-spi ' + statusOf(c.spiC) + '">' + fmtSpi(c.spiC) + '</span>' : '—') + '</td>'
+        + '<td class="num">' + impactDays(c.days) + '</td></tr>';
+    });
+    h += '</tbody></table></div></section>';
+  }
+  if (r.bandChanges){
+    var bandLbl = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
+    var bandTag = function(k){ return '<span class="ir-spi ' + k + '">' + bandLbl[k] + '</span>'; };
+    h += '<section class="ir-sec"><h3>Mudanças de status <span class="ir-h-note">' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? '' : 's') + '</span></h3>';
+    if (r.bandChanges.length){
+      h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Projeto</th><th>Mudança</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th></tr></thead><tbody>';
+      r.bandChanges.forEach(function(i){
+        var worse = i.bandDir > 0;
+        var term = Math.abs(i.dS) > 0.005 ? '<span class="' + (i.dS > 0 ? 'crit' : 'good') + '">' + impactDays(i.dS) + ' d</span>' : '0 d';
+        h += '<tr><td><div class="ir-proj">' + impactEsc(i.project) + '</div>' + (showCo ? '<div class="ir-muted">' + impactEsc(i.company) + '</div>' : '') + '</td>'
+          + '<td class="nw">' + bandTag(i.bandFrom) + ' <span class="ir-muted">→</span> ' + bandTag(i.bandTo) + ' <span class="' + (worse ? 'crit' : 'good') + '">' + (worse ? '▼ piorou' : '▲ melhorou') + '</span></td>'
+          + '<td class="num nw">' + fmtSpi(i.spiP) + ' <span class="ir-muted">→</span> ' + fmtSpi(i.spiC) + '</td>'
+          + '<td class="num"><span class="' + (i.dSpi < 0 ? 'crit' : 'good') + '">' + impactSigned(i.dSpi, 3) + '</span></td>'
+          + '<td class="num nw">' + impactPct(i.pctP) + ' → ' + impactPct(i.pctC) + '</td><td class="num nw">' + term + '</td></tr>';
+      });
+      h += '</tbody></table></div>';
+    } else {
+      h += '<p class="ir-empty">Nenhum projeto mudou de status em relação à semana anterior.</p>';
+    }
+    h += '</section>';
   }
   if (r.dragTop && r.dragTop.length){
     h += '<section class="ir-sec"><h3>Projetos que mais pesam no SPI Global (atraso acumulado) <span class="ir-h-note">' + r.dragTop.length + ' de ' + r.drag.length + ' projetos atrasados · ' + impactDays(r.dragTotalGap) + ' dias de atraso no total</span></h3>'
