@@ -110,7 +110,7 @@ function populateLoginUsers(){
 }
 function applyRolePermissions(){
   var admin = isAdminUser();
-  var toHideForViewer = ['adminToolbarTop', 'headerAuthRow', 'btnAdvanceWeek', 'btnDeleteWeek', 'btnPublishWeek', 'publishWeekStatus', 'tableHeadActions', 'thActions'];
+  var toHideForViewer = ['adminToolbarTop', 'headerAuthRow', 'weekActionsRow', 'btnAdvanceWeek', 'btnDeleteWeek', 'btnPublishWeek', 'publishWeekStatus', 'tableHeadActions', 'thActions'];
   toHideForViewer.forEach(function(id){
     var elm = document.getElementById(id);
     if (elm) elm.hidden = !admin;

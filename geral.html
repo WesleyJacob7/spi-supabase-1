@@ -163,6 +163,10 @@ header.top > div:first-child{ flex: 1 1 420px; min-width: 0; }
   margin-bottom: 22px;
 }
 .filter-group{ display:flex; align-items:center; gap:10px; }
+.filters.filters-2rows{ flex-direction:column; align-items:stretch; gap:12px; }
+.filter-row{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+.filter-actions{ justify-content:space-between; gap:10px 22px; padding-top:12px; border-top:1px solid var(--hairline); }
+.filter-actions[hidden]{ display:none; }
 .filter-group[hidden]{ display:none; }
 .filter-label{
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -656,20 +660,26 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
     </div>
   </nav>
 
-  <div class="filters fade-in d1">
-    <div class="filter-group">
-      <span class="filter-label">Week</span>
-      <select id="weekSelect" class="wk"></select>
-      <button type="button" class="btn ghost small" id="btnAdvanceWeek" title="Copia os projetos da semana atual para a próxima semana">Avançar semana →</button>
-      <button type="button" class="btn small danger-outline" id="btnDeleteWeek" title="Remove todos os lançamentos da semana selecionada (use se ela foi incluída por engano)">Excluir semana</button>
+  <div class="filters filters-2rows fade-in d1">
+    <div class="filter-row">
+      <div class="filter-group">
+        <span class="filter-label">Week</span>
+        <select id="weekSelect" class="wk"></select>
+      </div>
+      <div class="filter-group" id="companyFilterGroup">
+        <span class="filter-label">Empresa</span>
+        <div class="pillset" id="companyPills"></div>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">Escopo</span>
+        <div class="pillset" id="scopePills"></div>
+      </div>
     </div>
-    <div class="filter-group" id="companyFilterGroup">
-      <span class="filter-label">Empresa</span>
-      <div class="pillset" id="companyPills"></div>
-    </div>
-    <div class="filter-group">
-      <span class="filter-label">Escopo</span>
-      <div class="pillset" id="scopePills"></div>
+    <div class="filter-row filter-actions" id="weekActionsRow">
+      <div class="filter-group">
+        <button type="button" class="btn ghost small" id="btnAdvanceWeek" title="Copia os projetos da semana atual para a próxima semana">Avançar semana →</button>
+        <button type="button" class="btn small danger-outline" id="btnDeleteWeek" title="Remove todos os lançamentos da semana selecionada (use se ela foi incluída por engano)">Excluir semana</button>
+      </div>
     </div>
   </div>
 
