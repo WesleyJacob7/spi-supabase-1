@@ -4268,7 +4268,7 @@ function impactDiagnosis(it, Gp){
     parts.push(pp > 0 ? 'Prazo final mantido; avançou ' + ppTxt + '.' : 'Sem mudança no schedule nem no avanço.');
   }
   if (it.spiP !== null && it.spiC !== null && statusOf(it.spiP) !== statusOf(it.spiC)){
-    parts.push('Mudou de faixa: ' + impactStatusLabel(it.spiP) + ' → ' + impactStatusLabel(it.spiC) + '.');
+    parts.push('Mudou de status: ' + impactStatusLabel(it.spiP) + ' → ' + impactStatusLabel(it.spiC) + '.');
   }
   return parts.join(' ').replace(/\.\.(\s|$)/g, '.$1');
 }
@@ -4298,11 +4298,11 @@ function impactSummaryText(r){
   if (r.bandChanges && r.bandChanges.length){
     var nW = r.bandChanges.filter(function(i){ return i.bandDir > 0; }).length, nB = r.bandChanges.length - nW;
     var toCrit = r.bandChanges.filter(function(i){ return i.bandTo === 'crit'; }).map(function(i){ return i.project; });
-    t.push('Mudança de faixa: ' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? ' mudou' : 's mudaram') + ' de faixa'
+    t.push('Mudança de status: ' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? ' mudou' : 's mudaram') + ' de status'
       + ' (' + nW + ' para pior, ' + nB + ' para melhor)'
       + (toCrit.length ? '; ' + (toCrit.length === 1 ? 'entrou' : 'entraram') + ' no Crítico: ' + toCrit.join(', ') : '') + '.');
   } else {
-    t.push('Nenhum projeto mudou de faixa (Bom / Atenção / Crítico) em relação à semana anterior.');
+    t.push('Nenhum projeto mudou de status (Bom / Atenção / Crítico) em relação à semana anterior.');
   }
   if (r.top.length && r.topShare !== null){
     t.push((r.top.length === 1 ? 'O projeto abaixo responde' : 'Os ' + r.top.length + ' projetos abaixo respondem') + ' por cerca de ' + Math.round(Math.abs(r.topShare) * 100) + '% da ' + (r.down ? 'queda' : 'alta') + '.');
@@ -4353,7 +4353,7 @@ function renderImpactReport(){
   if (r.bandChanges){
     var bandLbl = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
     var bandTag = function(k){ return '<span class="ir-spi ' + k + '">' + bandLbl[k] + '</span>'; };
-    h += '<section class="ir-sec"><h3>Mudanças de faixa <span class="ir-h-note">' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? '' : 's') + '</span></h3>';
+    h += '<section class="ir-sec"><h3>Mudanças de status <span class="ir-h-note">' + r.bandChanges.length + ' projeto' + (r.bandChanges.length === 1 ? '' : 's') + '</span></h3>';
     if (r.bandChanges.length){
       h += '<div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Projeto</th><th>Mudança</th><th class="num">SPI</th><th class="num">Δ SPI</th><th class="num">% avanço</th><th class="num">Término</th></tr></thead><tbody>';
       r.bandChanges.forEach(function(i){
@@ -4367,7 +4367,7 @@ function renderImpactReport(){
       });
       h += '</tbody></table></div>';
     } else {
-      h += '<p class="ir-empty">Nenhum projeto mudou de faixa em relação à semana anterior.</p>';
+      h += '<p class="ir-empty">Nenhum projeto mudou de status em relação à semana anterior.</p>';
     }
     h += '</section>';
   }
