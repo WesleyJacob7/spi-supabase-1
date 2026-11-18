@@ -4217,13 +4217,7 @@ function computeImpact(week, company){
       if (!list.length) return null;
       var pc = cur.filter(function(d){ return d.company === co; }), pp = prev.filter(function(d){ return d.company === co; });
       var s1 = sum(pc, 'schedule_duration'), s0 = sum(pp, 'schedule_duration');
-      // SPI da semana só com os projetos que estavam nas duas semanas (sem o efeito de projetos que entraram/saíram)
-      var cm = list.filter(function(i){ return i.kind === 'common'; });
-      var lb = cm.reduce(function(a, i){ return a + i.bC; }, 0), ls = cm.reduce(function(a, i){ return a + i.sC; }, 0);
       return {
-        spiLike: ls > 0 ? lb / ls : null,
-        entered: list.filter(function(i){ return i.kind === 'new'; }).map(function(i){ return i.project; }),
-        left: list.filter(function(i){ return i.kind === 'left'; }).map(function(i){ return i.project; }),
         company: co, count: pc.length,
         spiP: s0 > 0 ? sum(pp, 'baseline_duration') / s0 : null,
         spiC: s1 > 0 ? sum(pc, 'baseline_duration') / s1 : null,
@@ -4336,16 +4330,9 @@ function renderImpactReport(){
     + '</section>';
   h += '<section class="ir-sec"><h3>O que gerou a variação</h3><div class="ir-summary ir-lead ' + dCls + '">' + impactSummaryText(r).map(function(p){ return '<p>' + impactEsc(p) + '</p>'; }).join('') + '</div></section>';
   if (r.byCompany && r.byCompany.length > 1){
-    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num" title="SPI da semana só com os projetos que estavam nas duas semanas — tira o efeito de projetos que entraram ou saíram">SPI ' + impactEsc(r.week) + '<br><span style="font-weight:400;font-size:.85em">mesmos projetos</span></th><th class="num">Términos (dias)</th></tr></thead><tbody>';
+    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num">Términos (dias)</th></tr></thead><tbody>';
     r.byCompany.forEach(function(c){
-      var chg = c.entered.length || c.left.length;
-      var like = c.spiLike !== null ? '<span class="ir-spi ' + statusOf(c.spiLike) + '">' + fmtSpi(c.spiLike) + '</span>' : '—';
-      if (chg && c.spiLike !== null && c.spiP !== null){
-        var dl = c.spiLike - c.spiP;
-        like += '<div style="font-size:11px;opacity:.75;margin-top:2px">' + (Math.abs(dl) < 0.0005 ? 'estável' : (dl > 0 ? 'melhorou ' : 'piorou ') + impactSigned(dl, 3)) + '</div>';
-      }
       h += '<tr><td><b>' + impactEsc(c.company) + '</b></td><td class="num">' + c.count + '</td><td class="num">' + (c.spiP !== null ? '<span class="ir-spi ' + statusOf(c.spiP) + '">' + fmtSpi(c.spiP) + '</span>' : '—') + '</td><td class="num">' + (c.spiC !== null ? '<span class="ir-spi ' + statusOf(c.spiC) + '">' + fmtSpi(c.spiC) + '</span>' : '—') + '</td>'
-        + '<td class="num">' + (chg ? like : '<span style="opacity:.6">= SPI ' + impactEsc(r.week) + '</span>') + '</td>'
         + '<td class="num">' + impactDays(c.days) + '</td></tr>';
     });
     h += '</tbody></table></div></section>';
