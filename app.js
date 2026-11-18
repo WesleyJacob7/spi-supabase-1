@@ -5308,27 +5308,32 @@ function weekRefDate(w){
   DATA.forEach(function(d){ if (d.week === w && d.date){ cnt[d.date] = (cnt[d.date] || 0) + 1; if (!ref || cnt[d.date] > cnt[ref]) ref = d.date; } });
   return ref || (w ? dateFromWeekLabel(w) : '');
 }
-// caixa "Date" ao lado da semana: só mostra a data de referência da semana escolhida (o filtro continua sendo a semana)
+// caixa "Date" ao lado da semana: lista as datas de referência de cada semana; escolher uma data seleciona
+// a semana correspondente (e trocar a semana atualiza a data) — os dois filtros andam juntos
 function updateWeekDateBox(){
   var box = document.getElementById('weekDateBox');
   if (!box) return;
-  var ref = state.week ? weekRefDate(state.week) : '';
-  box.textContent = ref ? fmtDateMDY(ref) : '—';
+  var sig = weeks.join('|') + '#' + DATA.length;
+  if (box.getAttribute('data-sig') !== sig){
+    box.innerHTML = '';
+    weeks.forEach(function(w){
+      var ref = weekRefDate(w);
+      var opt = document.createElement('option'); opt.value = w; opt.textContent = ref ? fmtDateMDY(ref) : w;
+      box.appendChild(opt);
+    });
+    box.setAttribute('data-sig', sig);
+  }
+  box.value = state.week || '';
 }
 function initWeekSelect(){
   var sel = document.getElementById('weekSelect');
   if (sel && !document.getElementById('weekDateBox')){
     var lbl = document.createElement('span'); lbl.className = 'filter-label'; lbl.textContent = 'Date'; lbl.style.marginLeft = '4px';
-    var box = document.createElement('span'); box.id = 'weekDateBox'; box.className = 'wk wk-date';
-    box.title = 'Data de referência da semana selecionada (muda junto com a semana)';
-    box.setAttribute('aria-live', 'polite');
+    var box = document.createElement('select'); box.id = 'weekDateBox'; box.className = 'wk';
+    box.title = 'Data de referência da semana — escolher uma data seleciona a semana dela';
+    box.addEventListener('change', function(){ state.week = box.value; if (sel) sel.value = box.value; render(); });
     sel.parentNode.insertBefore(box, sel.nextSibling);
     sel.parentNode.insertBefore(lbl, box);
-    if (!document.getElementById('wkDateCss')){
-      var st = document.createElement('style'); st.id = 'wkDateCss';
-      st.textContent = '.wk-date{ display:inline-flex; align-items:center; min-width:92px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background: var(--surface-2, transparent); color: var(--text-primary); font-size:13px; font-weight:500; font-variant-numeric: tabular-nums; cursor:default; user-select:all; }';
-      document.head.appendChild(st);
-    }
   }
   populateWeekOptions();
   sel.addEventListener('change', function(){ state.week = sel.value; render(); });
