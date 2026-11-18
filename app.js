@@ -362,10 +362,288 @@ function pmEmailForProject(project){
   return matches[0].pm_email;
 }
 function pmNameForProject(project){
+  // nome do cadastro de PMs tem prioridade (assim, corrigir o nome no
+  // cadastro já vale para a saudação dos e-mails de todos os projetos dele)
+  var em = pmEmailForProject(project);
+  var reg = em ? pmRegistryByEmail(em) : null;
+  if (reg) return reg.name;
   var matches = DATA.filter(function(d){ return d.project === project && d.pm_name; });
   if (!matches.length) return '';
   matches.sort(function(a, b){ return a.date < b.date ? 1 : (a.date > b.date ? -1 : 0); });
   return matches[0].pm_name;
+}
+
+/* ---------- Cadastro de PMs (tabela pm_registry) ----------
+   Lista de PMs por empresa, usada no campo "PM" do formulário de
+   lançamento (select filtrado pela empresa do projeto). O nome e o e-mail
+   escolhidos continuam gravados em cada lançamento (pm_name / pm_email),
+   como antes — o cadastro só alimenta a escolha. */
+var PM_REGISTRY = [];
+var pmRegEditingId = null;
+var pmRegFromForm = false; // aberto pelo "+ Cadastrar novo PM…" do formulário de lançamento
+async function loadPmRegistry(){
+  if (!supabaseClient){ PM_REGISTRY = []; return; }
+  try {
+    var res = await supabaseClient.from('pm_registry').select('*').order('name', { ascending: true });
+    if (res.error) throw res.error;
+    PM_REGISTRY = res.data || [];
+  } catch (err){
+    console.error('Falha ao carregar o cadastro de PMs:', err);
+    PM_REGISTRY = [];
+  }
+}
+function sameCompany(a, b){ return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(); }
+function pmRegistryByEmail(email, company){
+  var e = String(email || '').trim().toLowerCase();
+  if (!e) return null;
+  var list = PM_REGISTRY.filter(function(r){ return r.email.toLowerCase() === e; });
+  if (company){ var c = list.filter(function(r){ return sameCompany(r.company, company); }); if (c.length) return c[0]; }
+  return list[0] || null;
+}
+function pmRegistryFor(company, includeInactive){
+  return PM_REGISTRY.filter(function(r){
+    return (includeInactive || r.active) && (!company || sameCompany(r.company, company));
+  }).sort(function(a, b){ return a.name.localeCompare(b.name); });
+}
+function pmRegistryCompanies(){
+  var set = new Set(['JKA', 'Prestige']);
+  companies.forEach(function(c){ if (c) set.add(c); });
+  PM_REGISTRY.forEach(function(r){ set.add(r.company); });
+  return Array.from(set).sort();
+}
+
+// monta o select "PM" do formulário a partir da empresa digitada e do
+// PM já gravado no lançamento (fPmName/fPmEmail)
+function syncPmSelect(){
+  var sel = document.getElementById('fPmSelect');
+  if (!sel) return;
+  var company = (document.getElementById('fCompany').value || '').trim();
+  var email = (document.getElementById('fPmEmail').value || '').trim();
+  var name = (document.getElementById('fPmName').value || '').trim();
+  var hint = document.getElementById('fPmHint');
+  sel.innerHTML = '';
+  function opt(parent, value, label){
+    var o = document.createElement('option'); o.value = value; o.textContent = label; parent.appendChild(o); return o;
+  }
+  opt(sel, '', '— sem PM —');
+  var known = false;
+  function addList(parent, list){
+    list.forEach(function(r){
+      opt(parent, r.email.toLowerCase(), r.name + ' — ' + r.email);
+      if (email && r.email.toLowerCase() === email.toLowerCase()) known = true;
+    });
+  }
+  if (company){
+    addList(sel, pmRegistryFor(company));
+    if (hint) hint.textContent = pmRegistryFor(company).length ? 'PMs cadastrados da ' + company + '.' : 'Nenhum PM cadastrado para "' + company + '" — use "+ Cadastrar novo PM".';
+  } else {
+    pmRegistryCompanies().forEach(function(c){
+      var list = pmRegistryFor(c);
+      if (!list.length) return;
+      var g = document.createElement('optgroup'); g.label = c; sel.appendChild(g);
+      addList(g, list);
+    });
+    if (hint) hint.textContent = 'Preencha a empresa para ver só os PMs dela.';
+  }
+  if (email && !known){
+    // PM gravado no lançamento mas fora do cadastro (ou de outra empresa/inativo): mantém visível
+    opt(sel, email.toLowerCase(), (name || email) + ' — ' + email + ' (fora do cadastro)');
+  }
+  opt(sel, '__new__', '+ Cadastrar novo PM…');
+  sel.value = email ? email.toLowerCase() : '';
+}
+function applyPmSelect(){
+  var sel = document.getElementById('fPmSelect');
+  var v = sel.value;
+  var fName = document.getElementById('fPmName');
+  var fEmail = document.getElementById('fPmEmail');
+  if (v === '__new__'){
+    var company = (document.getElementById('fCompany').value || '').trim();
+    syncPmSelect(); // volta para o PM que estava escolhido
+    openPmRegistry(company);
+    pmRegFromForm = true;
+    return;
+  }
+  if (!v){ fName.value = ''; fEmail.value = ''; return; }
+  var reg = pmRegistryByEmail(v, document.getElementById('fCompany').value);
+  if (reg){ fName.value = reg.name; fEmail.value = reg.email; }
+}
+function onFormCompanyChange(){
+  var sel = document.getElementById('fPmSelect');
+  if (!sel) return;
+  var company = (document.getElementById('fCompany').value || '').trim();
+  var email = (document.getElementById('fPmEmail').value || '').trim();
+  // PM de outra empresa não combina com a empresa nova: limpa a escolha
+  if (company && email){
+    var reg = pmRegistryByEmail(email);
+    if (reg && !sameCompany(pmRegistryByEmail(email, company).company, company)){
+      document.getElementById('fPmName').value = '';
+      document.getElementById('fPmEmail').value = '';
+    }
+  }
+  syncPmSelect();
+}
+
+function renderPmRegistry(){
+  var wrap = document.getElementById('pmRegList');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  var usage = {};
+  DATA.forEach(function(d){
+    if (!d.pm_email) return;
+    var k = d.pm_email.toLowerCase();
+    (usage[k] = usage[k] || new Set()).add(d.project);
+  });
+  var cos = pmRegistryCompanies().filter(function(c){ return pmRegistryFor(c, true).length; });
+  if (!cos.length){
+    var e = document.createElement('div'); e.className = 'excluded-empty'; e.textContent = 'Nenhum PM cadastrado.';
+    wrap.appendChild(e); return;
+  }
+  cos.forEach(function(c){
+    var list = pmRegistryFor(c, true);
+    var h = document.createElement('div'); h.className = 'pmreg-section';
+    h.textContent = c + ' — ' + list.filter(function(r){ return r.active; }).length + ' ativos';
+    wrap.appendChild(h);
+    list.forEach(function(r){
+      var row = document.createElement('div'); row.className = 'pmreg-row' + (r.active ? '' : ' inactive');
+      var n = document.createElement('span'); n.className = 'pmreg-name'; n.textContent = r.name;
+      var em = document.createElement('span'); em.className = 'pmreg-email'; em.textContent = r.email;
+      var used = usage[r.email.toLowerCase()];
+      var cnt = document.createElement('span'); cnt.className = 'pmreg-count';
+      cnt.textContent = used ? used.size + (used.size === 1 ? ' projeto' : ' projetos') : 'sem projetos';
+      if (used) cnt.title = Array.from(used).sort().join('\n');
+      var bEdit = document.createElement('button'); bEdit.type = 'button'; bEdit.className = 'btn ghost small'; bEdit.textContent = 'Editar';
+      bEdit.addEventListener('click', function(){ startPmEdit(r); });
+      var bAct = document.createElement('button'); bAct.type = 'button'; bAct.className = 'btn ghost small';
+      bAct.textContent = r.active ? 'Desativar' : 'Reativar';
+      bAct.title = r.active ? 'Sai da lista do campo PM (os lançamentos já gravados não mudam)' : 'Volta para a lista do campo PM';
+      bAct.addEventListener('click', function(){ savePmRegistry({ active: !r.active }, r.id); });
+      var bDel = document.createElement('button'); bDel.type = 'button'; bDel.className = 'btn small danger-outline'; bDel.textContent = 'Excluir';
+      if (used){ bDel.disabled = true; bDel.title = 'PM com projetos lançados — use "Desativar"'; }
+      var armed = false, t = null;
+      bDel.addEventListener('click', function(){
+        if (!armed){ armed = true; bDel.textContent = 'Confirmar?'; t = setTimeout(function(){ armed = false; bDel.textContent = 'Excluir'; }, 4000); return; }
+        clearTimeout(t); deletePmRegistry(r.id);
+      });
+      row.appendChild(n); row.appendChild(em); row.appendChild(cnt); row.appendChild(bEdit); row.appendChild(bAct); row.appendChild(bDel);
+      wrap.appendChild(row);
+    });
+  });
+}
+function fillPmRegCompanies(selected){
+  var sel = document.getElementById('pmRegCompany');
+  if (!sel) return;
+  sel.innerHTML = '';
+  pmRegistryCompanies().forEach(function(c){
+    var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o);
+  });
+  if (selected){
+    var m = pmRegistryCompanies().find(function(c){ return sameCompany(c, selected); });
+    if (m) sel.value = m;
+  }
+}
+function resetPmRegForm(company){
+  pmRegEditingId = null;
+  fillPmRegCompanies(company || (document.getElementById('pmRegCompany') || {}).value);
+  document.getElementById('pmRegName').value = '';
+  document.getElementById('pmRegEmail').value = '';
+  document.getElementById('pmRegSave').textContent = 'Adicionar';
+  document.getElementById('pmRegCancel').hidden = true;
+}
+function startPmEdit(r){
+  pmRegEditingId = r.id;
+  fillPmRegCompanies(r.company);
+  document.getElementById('pmRegName').value = r.name;
+  document.getElementById('pmRegEmail').value = r.email;
+  document.getElementById('pmRegSave').textContent = 'Atualizar';
+  document.getElementById('pmRegCancel').hidden = false;
+  document.getElementById('pmRegName').focus();
+}
+function openPmRegistry(company){
+  pmRegFromForm = false;
+  resetPmRegForm(company);
+  renderPmRegistry();
+  document.getElementById('pmRegistryOverlay').hidden = false;
+  document.getElementById('pmRegName').focus();
+}
+function closePmRegistry(){
+  document.getElementById('pmRegistryOverlay').hidden = true;
+  syncPmSelect();
+}
+async function savePmRegistry(payload, id){
+  if (!supabaseClient){ showToast('Supabase não configurado — cadastro não salvo.', 'warn'); return false; }
+  try {
+    var res = id != null
+      ? await supabaseClient.from('pm_registry').update(payload).eq('id', id).select()
+      : await supabaseClient.from('pm_registry').insert(payload).select();
+    if (res.error) throw res.error;
+    if (!res.data || !res.data.length) throw new Error('nenhuma linha gravada');
+    await loadPmRegistry();
+    renderPmRegistry();
+    syncPmSelect();
+    return true;
+  } catch (err){
+    console.error('Falha ao salvar PM:', err);
+    var dup = err && (err.code === '23505' || /duplicate/i.test(err.message || ''));
+    showToast(dup ? 'Esse e-mail já está cadastrado para essa empresa.' : 'Não foi possível salvar o PM.', 'warn');
+    return false;
+  }
+}
+async function deletePmRegistry(id){
+  if (!supabaseClient) return;
+  try {
+    var res = await supabaseClient.from('pm_registry').delete().eq('id', id);
+    if (res.error) throw res.error;
+    if (pmRegEditingId === id) resetPmRegForm();
+    await loadPmRegistry();
+    renderPmRegistry();
+    syncPmSelect();
+    showToast('PM excluído do cadastro.');
+  } catch (err){
+    console.error('Falha ao excluir PM:', err);
+    showToast('Não foi possível excluir o PM.', 'warn');
+  }
+}
+function initPmRegistry(){
+  var btn = document.getElementById('btnPmRegistry');
+  var overlay = document.getElementById('pmRegistryOverlay');
+  if (!overlay) return;
+  if (btn) btn.addEventListener('click', function(){ openPmRegistry(); });
+  document.getElementById('pmRegistryClose').addEventListener('click', closePmRegistry);
+  overlay.addEventListener('click', function(e){ if (e.target === overlay) closePmRegistry(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !overlay.hidden) closePmRegistry(); });
+  document.getElementById('pmRegCancel').addEventListener('click', function(){ resetPmRegForm(); });
+  document.getElementById('pmRegForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    var company = document.getElementById('pmRegCompany').value.trim();
+    var name = document.getElementById('pmRegName').value.trim();
+    var email = document.getElementById('pmRegEmail').value.trim();
+    if (!company || !name || !email){ showToast('Preencha empresa, nome e e-mail.', 'warn'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showToast('E-mail inválido.', 'warn'); return; }
+    var editing = pmRegEditingId;
+    var ok = await savePmRegistry({ company: company, name: name, email: email }, editing);
+    if (ok){
+      showToast(editing != null ? 'PM atualizado.' : ('PM ' + name + ' cadastrado na ' + company + '.'));
+      resetPmRegForm(company);
+      // veio do formulário de lançamento: já escolhe o PM novo e volta pro formulário
+      if (editing == null && pmRegFromForm && !document.getElementById('modalOverlay').hidden){
+        var fCo = document.getElementById('fCompany');
+        if (!fCo.value.trim()) fCo.value = company;
+        if (sameCompany(fCo.value, company)){
+          document.getElementById('fPmName').value = name;
+          document.getElementById('fPmEmail').value = email;
+        }
+        closePmRegistry();
+      }
+    }
+  });
+  var sel = document.getElementById('fPmSelect');
+  if (sel) sel.addEventListener('change', applyPmSelect);
+  var fCompany = document.getElementById('fCompany');
+  if (fCompany && sel){
+    fCompany.addEventListener('change', onFormCompanyChange);
+    fCompany.addEventListener('input', onFormCompanyChange);
+  }
 }
 
 /* ---------- status-update e-mail generation (mirrors the e-mail templates doc) ---------- */
@@ -4730,6 +5008,7 @@ function openModal(mode, row){
   delBtn.disabled = false;
 
   updatePreview();
+  syncPmSelect();
   document.getElementById('modalOverlay').hidden = false;
   document.getElementById('fProject').focus();
 }
@@ -4784,6 +5063,7 @@ function initFormListeners(){
       var knownName = pmNameForProject(fProject.value.trim());
       if (knownName) fPmName.value = knownName;
     }
+    syncPmSelect();
   });
   var fCode = document.getElementById('fCode');
   if (fCode) fCode.addEventListener('change', function(){
@@ -4799,6 +5079,7 @@ function initFormListeners(){
       if (fPmEmail && !fPmEmail.value.trim() && match.pm_email) fPmEmail.value = match.pm_email;
       var fPmName = document.getElementById('fPmName');
       if (fPmName && !fPmName.value.trim() && match.pm_name) fPmName.value = match.pm_name;
+      syncPmSelect();
     }
   });
   var btnAdd = document.getElementById('btnAdd');
@@ -5028,6 +5309,7 @@ async function boot(){
     DATA = DATA.filter(function(d){ return d.week <= publishedWeek; });
   }
   await loadExcluded();
+  if (isAdminUser()) await loadPmRegistry();
   recomputeDerivedLists();
 
   populateDatalists();
@@ -5037,6 +5319,7 @@ async function boot(){
   initSortHeaders();
   initFormListeners();
   initExcludedModal();
+  initPmRegistry();
   initWeeklyReport();
   initImpactReport();
   updateExcludedButtonLabel();

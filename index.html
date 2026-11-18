@@ -553,6 +553,24 @@ textarea.reply-input:focus-visible{ outline:2px solid var(--focus-ring); outline
   width:100%;
 }
 .form-field input:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+.form-field select{
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size:14px; color: var(--text-primary);
+  background: var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:8px 10px; width:100%;
+}
+.form-field select:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:1px; }
+.form-field input[readonly]{ color: var(--text-muted); }
+.pmreg-form{ display:grid; grid-template-columns: 130px 1fr 1.4fr auto; gap:8px; align-items:end; margin:4px 0 14px; }
+.pmreg-form .form-field input, .pmreg-form .form-field select{ font-size:13px; padding:7px 9px; }
+.pmreg-form .pmreg-btns{ display:flex; gap:6px; }
+.pmreg-section{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color: var(--text-muted); margin:14px 0 2px; }
+.pmreg-row{ display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--hairline); }
+.pmreg-row:last-child{ border-bottom:none; }
+.pmreg-row .pmreg-name{ font-size:13.5px; font-weight:600; color: var(--text-primary); min-width:110px; }
+.pmreg-row .pmreg-email{ font-size:12.5px; color: var(--text-muted); flex:1; overflow-wrap:anywhere; }
+.pmreg-row .pmreg-count{ font-size:11.5px; color: var(--text-muted); white-space:nowrap; }
+.pmreg-row.inactive .pmreg-name, .pmreg-row.inactive .pmreg-email{ opacity:.5; text-decoration: line-through; }
+.pmreg-list{ max-height:55vh; overflow:auto; }
+@media (max-width:640px){ .pmreg-form{ grid-template-columns:1fr; } }
 .form-hint{ font-size:11px; color: var(--text-muted); }
 .form-preview{
   grid-column: 1/-1; display:flex; gap:22px; flex-wrap:wrap; padding:12px 14px; border-radius:9px;
@@ -809,6 +827,7 @@ body.impact-open{ overflow:hidden; }
         <button type="button" class="btn ghost small" id="btnExportData" title="Baixa um arquivo com todos os lançamentos atuais">Exportar dados</button>
         <button type="button" class="btn ghost small" id="btnImportData" title="Carrega lançamentos de um arquivo exportado anteriormente">Importar dados</button>
         <input type="file" id="importFileInput" accept="application/json" hidden>
+        <button type="button" class="btn ghost small" id="btnPmRegistry" title="Cadastro dos PMs de cada empresa (lista usada no campo PM dos lançamentos)">Cadastro de PMs</button>
         <button type="button" class="btn ghost small" id="btnManageExcluded" title="Projetos excluídos (todas as semanas) ou encerrados (a partir de uma semana)">Projetos excluídos / encerrados</button>
         <button type="button" class="btn ghost small" id="btnWeeklyReport" title="Compara a semana selecionada com a semana anterior">Relatório semanal</button>
         <button type="button" class="btn ghost small" id="btnImpactReport" title="Mostra quais projetos geraram a variação do SPI Global na semana — visão geral ou por empresa, com exportação em PDF">Análise de impacto</button>
@@ -1059,15 +1078,18 @@ body.impact-open{ overflow:hidden; }
           <label for="fPct">% physical complete</label>
           <input type="number" id="fPct" name="pct_complete" min="0" max="100" step="1" required>
         </div>
-        <div class="form-field span2">
-          <label for="fPmEmail">PM email (optional)</label>
-          <input type="email" id="fPmEmail" name="pm_email" autocomplete="off" placeholder="pm@company.com">
-          <span class="form-hint">Used by the "Enviar e-mail ao PM" button next to "+ Novo lançamento".</span>
+        <div class="form-field">
+          <label for="fPmSelect">PM</label>
+          <select id="fPmSelect"></select>
+          <span class="form-hint" id="fPmHint">Lista dos PMs cadastrados da empresa do projeto.</span>
         </div>
-        <div class="form-field span2">
-          <label for="fPmName">PM name (optional)</label>
-          <input type="text" id="fPmName" name="pm_name" autocomplete="off" placeholder="Nome do Gerente de Contrato">
-          <span class="form-hint">Usado na saudação do e-mail ("Prezado(a) [Nome do PM],"); sem isso, o e-mail usa "Prezado(a) Gerente de Contrato,".</span>
+        <div class="form-field">
+          <label for="fPmEmail">PM email</label>
+          <input type="email" id="fPmEmail" name="pm_email" autocomplete="off" readonly tabindex="-1" placeholder="preenchido pelo PM escolhido">
+          <span class="form-hint">Usado no "Enviar e-mail ao PM" e na saudação do e-mail.</span>
+        </div>
+        <div class="form-field" hidden style="display:none">
+          <input type="text" id="fPmName" name="pm_name" autocomplete="off">
         </div>
         <div class="form-error" id="formError"></div>
         <div class="form-preview">
@@ -1264,6 +1286,26 @@ body.impact-open{ overflow:hidden; }
     </div>
     <p class="modal-sub"><b>Encerrados</b> somem só a partir da semana indicada (as anteriores continuam no painel) &mdash; "Desfazer" volta a mostrar em todas. <b>Excluídos</b> somem de todas as semanas &mdash; "Reincluir" traz de volta.</p>
     <div id="excludedList"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pmRegistryOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pmRegistryTitle" style="max-width:760px;">
+    <div class="modal-head">
+      <div class="modal-title" id="pmRegistryTitle">Cadastro de PMs</div>
+      <button type="button" class="modal-close" id="pmRegistryClose" aria-label="Fechar">&times;</button>
+    </div>
+    <p class="modal-sub">PMs de cada empresa. Os ativos aparecem na lista do campo PM ao lançar ou editar um projeto. O nome é o usado na saudação do e-mail ("Prezado(a) [Nome],").</p>
+    <form class="pmreg-form" id="pmRegForm" novalidate>
+      <div class="form-field"><label for="pmRegCompany">Empresa</label><select id="pmRegCompany"></select></div>
+      <div class="form-field"><label for="pmRegName">Nome</label><input type="text" id="pmRegName" autocomplete="off" placeholder="ex.: Wallace"></div>
+      <div class="form-field"><label for="pmRegEmail">E-mail</label><input type="email" id="pmRegEmail" autocomplete="off" placeholder="pm@empresa.com"></div>
+      <div class="pmreg-btns">
+        <button type="submit" class="btn primary small" id="pmRegSave">Adicionar</button>
+        <button type="button" class="btn ghost small" id="pmRegCancel" hidden>Cancelar</button>
+      </div>
+    </form>
+    <div class="pmreg-list" id="pmRegList"></div>
   </div>
 </div>
 
