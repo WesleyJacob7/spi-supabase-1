@@ -429,7 +429,7 @@ function syncPmSelect(){
   var known = false;
   function addList(parent, list){
     list.forEach(function(r){
-      opt(parent, r.email.toLowerCase(), r.name + ' — ' + r.email);
+      opt(parent, r.email.toLowerCase(), r.name);
       if (email && r.email.toLowerCase() === email.toLowerCase()) known = true;
     });
   }
@@ -447,7 +447,7 @@ function syncPmSelect(){
   }
   if (email && !known){
     // PM gravado no lançamento mas fora do cadastro (ou de outra empresa/inativo): mantém visível
-    opt(sel, email.toLowerCase(), (name || email) + ' — ' + email + ' (fora do cadastro)');
+    opt(sel, email.toLowerCase(), (name || email) + ' (fora do cadastro)');
   }
   opt(sel, '__new__', '+ Cadastrar novo PM…');
   sel.value = email ? email.toLowerCase() : '';
