@@ -4494,6 +4494,57 @@ function initImpactReport(){
   });
 }
 
+/* clique no número de projetos (faixa ou empresa): abre, logo abaixo da linha, a lista dos projetos
+   com SPI e % físico; clicar no nome abre o histórico de SPI do projeto no gráfico */
+var bdOpen = { band: null, company: null };
+function ensureBdCss(){
+  if (document.getElementById('bdListCss')) return;
+  var st = document.createElement('style'); st.id = 'bdListCss';
+  st.textContent = '.bd-count{ font:inherit; font-weight:600; color: var(--accent, var(--text-primary)); background:none; border:none; padding:1px 4px; margin:-1px -4px; border-radius:4px; cursor:pointer; text-decoration: underline dotted; text-underline-offset:3px; }'
+    + '.bd-count:hover, .bd-count[aria-expanded="true"]{ background: var(--surface-2, rgba(127,127,127,.12)); text-decoration:none; }'
+    + '.bd-count[disabled]{ cursor:default; text-decoration:none; color:inherit; opacity:.6; }'
+    + 'tr.bd-list-row > td{ padding:0 0 8px !important; border-top:none !important; }'
+    + '.bd-list{ display:flex; flex-direction:column; gap:1px; padding:6px 8px; border-radius:6px; background: var(--surface-2, rgba(127,127,127,.08)); max-height:260px; overflow:auto; }'
+    + '.bd-li{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:3px 2px; }'
+    + '.bd-li .bd-name{ flex:1; min-width:0; text-align:left; font:inherit; color: var(--text-primary); background:none; border:none; padding:0; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
+    + '.bd-li .bd-name:hover{ text-decoration:underline; }'
+    + '.bd-li .bd-co{ font-size:11px; color: var(--text-muted); }'
+    + '.bd-li .bd-pct{ font-size:11.5px; color: var(--text-muted); min-width:34px; text-align:right; }'
+    + '.bd-li .bd-val{ min-width:42px; text-align:right; }';
+  document.head.appendChild(st);
+}
+function bdCountCell(list, kind, key, tbody, tr, cols){
+  var td = document.createElement('td'); td.className = 'num';
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'bd-count'; b.textContent = list.length;
+  if (!list.length){ b.disabled = true; td.appendChild(b); return td; }
+  b.title = 'Ver os projetos (' + list.length + ')';
+  var open = bdOpen[kind] === key;
+  b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  b.addEventListener('click', function(){ bdOpen[kind] = (bdOpen[kind] === key) ? null : key; render(); });
+  td.appendChild(b);
+  if (open){
+    // a linha da lista entra logo depois da linha do número (depois que ela for inserida)
+    setTimeout(function(){
+      var lr = document.createElement('tr'); lr.className = 'bd-list-row';
+      var ltd = document.createElement('td'); ltd.colSpan = cols;
+      var box = document.createElement('div'); box.className = 'bd-list';
+      list.slice().sort(function(a, c){ return (Number(a.spi) || 0) - (Number(c.spi) || 0) || String(a.project).localeCompare(String(c.project)); }).forEach(function(d){
+        var li = document.createElement('div'); li.className = 'bd-li';
+        var nm = document.createElement('button'); nm.type = 'button'; nm.className = 'bd-name'; nm.textContent = d.project;
+        nm.title = 'Ver o histórico de SPI de ' + d.project;
+        nm.addEventListener('click', function(){ state.isolatedProject = d.project; state.trendMode = true; render(); var c = document.getElementById('chart'); if (c && c.scrollIntoView) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+        var co = document.createElement('span'); co.className = 'bd-co'; co.textContent = kind === 'band' ? d.company : (d.band || '');
+        var pc = document.createElement('span'); pc.className = 'bd-pct'; pc.textContent = fmtPct(d.pct_complete); pc.title = '% físico concluído';
+        var sv = document.createElement('span'); sv.className = 'bd-val ' + statusOf(d.spi); sv.textContent = fmtSpi(d.spi);
+        li.appendChild(nm); li.appendChild(co); li.appendChild(pc); li.appendChild(sv);
+        box.appendChild(li);
+      });
+      ltd.appendChild(box); lr.appendChild(ltd);
+      if (tr.parentNode === tbody) tbody.insertBefore(lr, tr.nextSibling);
+    }, 0);
+  }
+  return td;
+}
 function renderBandBreakdown(rows){
   var tbody = document.getElementById('bandBreakdownBody');
   if (!tbody) return;
@@ -4503,7 +4554,8 @@ function renderBandBreakdown(rows){
     var list = rows.filter(function(d){ return d.band === band; });
     var tr = document.createElement('tr');
     var tdB = document.createElement('td'); tdB.textContent = band; tr.appendChild(tdB);
-    var tdN = document.createElement('td'); tdN.className = 'num'; tdN.textContent = list.length; tr.appendChild(tdN);
+    ensureBdCss();
+    tr.appendChild(bdCountCell(list, 'band', band, tbody, tr, 3));
     tr.appendChild(spiCell(list));
     tbody.appendChild(tr);
   });
@@ -4525,7 +4577,8 @@ function renderCompanyBreakdown(rows){
 
     var tdC = document.createElement('td'); tdC.textContent = company; tr.appendChild(tdC);
 
-    var tdN = document.createElement('td'); tdN.className = 'num'; tdN.textContent = list.length; tr.appendChild(tdN);
+    ensureBdCss();
+    tr.appendChild(bdCountCell(list, 'company', company, tbody, tr, 3));
     tr.appendChild(spiCell(list));
     tbody.appendChild(tr);
   });
