@@ -165,7 +165,8 @@ header.top > div:first-child{ flex: 1 1 420px; min-width: 0; }
 .filter-group{ display:flex; align-items:center; gap:10px; }
 .filters.filters-2rows{ flex-direction:column; align-items:stretch; gap:12px; }
 .filter-row{ display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
-.filter-actions{ justify-content:space-between; gap:10px 22px; padding-top:12px; border-top:1px solid var(--hairline); }
+.filter-actions{ justify-content:space-between; gap:10px 22px; padding-bottom:12px; border-bottom:1px solid var(--hairline); }
+.filter-main{ justify-content:space-between; }
 .filter-actions[hidden]{ display:none; }
 .filter-group[hidden]{ display:none; }
 .filter-label{
@@ -661,7 +662,13 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   </nav>
 
   <div class="filters filters-2rows fade-in d1">
-    <div class="filter-row">
+    <div class="filter-row filter-actions" id="weekActionsRow">
+      <div class="filter-group">
+        <button type="button" class="btn ghost small" id="btnAdvanceWeek" title="Copia os projetos da semana atual para a próxima semana">Avançar semana →</button>
+        <button type="button" class="btn small danger-outline" id="btnDeleteWeek" title="Remove todos os lançamentos da semana selecionada (use se ela foi incluída por engano)">Excluir semana</button>
+      </div>
+    </div>
+    <div class="filter-row filter-main">
       <div class="filter-group">
         <span class="filter-label">Week</span>
         <select id="weekSelect" class="wk"></select>
@@ -673,12 +680,6 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
       <div class="filter-group">
         <span class="filter-label">Escopo</span>
         <div class="pillset" id="scopePills"></div>
-      </div>
-    </div>
-    <div class="filter-row filter-actions" id="weekActionsRow">
-      <div class="filter-group">
-        <button type="button" class="btn ghost small" id="btnAdvanceWeek" title="Copia os projetos da semana atual para a próxima semana">Avançar semana →</button>
-        <button type="button" class="btn small danger-outline" id="btnDeleteWeek" title="Remove todos os lançamentos da semana selecionada (use se ela foi incluída por engano)">Excluir semana</button>
       </div>
     </div>
   </div>
