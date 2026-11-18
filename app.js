@@ -4759,6 +4759,7 @@ function escapeHtmlEvo(v){ return String(v === null || v === undefined ? '' : v)
 /* ---------- main render ---------- */
 function render(){
   var rows = currentRows();
+  updateWeekDateBox();
   var svg = document.getElementById('chart');
 
   var idCount = document.getElementById('id-count');
@@ -5301,8 +5302,34 @@ function populateWeekOptions(){
   });
   sel.value = state.week || '';
 }
+// data de referência da semana = a data mais frequente dos lançamentos dela (igual ao histórico/evolução)
+function weekRefDate(w){
+  var cnt = {}, ref = '';
+  DATA.forEach(function(d){ if (d.week === w && d.date){ cnt[d.date] = (cnt[d.date] || 0) + 1; if (!ref || cnt[d.date] > cnt[ref]) ref = d.date; } });
+  return ref || (w ? dateFromWeekLabel(w) : '');
+}
+// caixa "Date" ao lado da semana: só mostra a data de referência da semana escolhida (o filtro continua sendo a semana)
+function updateWeekDateBox(){
+  var box = document.getElementById('weekDateBox');
+  if (!box) return;
+  var ref = state.week ? weekRefDate(state.week) : '';
+  box.textContent = ref ? fmtDateMDY(ref) : '—';
+}
 function initWeekSelect(){
   var sel = document.getElementById('weekSelect');
+  if (sel && !document.getElementById('weekDateBox')){
+    var lbl = document.createElement('span'); lbl.className = 'filter-label'; lbl.textContent = 'Date'; lbl.style.marginLeft = '4px';
+    var box = document.createElement('span'); box.id = 'weekDateBox'; box.className = 'wk wk-date';
+    box.title = 'Data de referência da semana selecionada (muda junto com a semana)';
+    box.setAttribute('aria-live', 'polite');
+    sel.parentNode.insertBefore(box, sel.nextSibling);
+    sel.parentNode.insertBefore(lbl, box);
+    if (!document.getElementById('wkDateCss')){
+      var st = document.createElement('style'); st.id = 'wkDateCss';
+      st.textContent = '.wk-date{ display:inline-flex; align-items:center; min-width:92px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background: var(--surface-2, transparent); color: var(--text-primary); font-size:13px; font-weight:500; font-variant-numeric: tabular-nums; cursor:default; user-select:all; }';
+      document.head.appendChild(st);
+    }
+  }
   populateWeekOptions();
   sel.addEventListener('change', function(){ state.week = sel.value; render(); });
 }
