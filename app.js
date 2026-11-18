@@ -4336,11 +4336,9 @@ function renderImpactReport(){
     + '</section>';
   h += '<section class="ir-sec"><h3>O que gerou a variação</h3><div class="ir-summary ir-lead ' + dCls + '">' + impactSummaryText(r).map(function(p){ return '<p>' + impactEsc(p) + '</p>'; }).join('') + '</div></section>';
   if (r.byCompany && r.byCompany.length > 1){
-    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num" title="SPI da semana só com os projetos que estavam nas duas semanas — tira o efeito de projetos que entraram ou saíram">SPI ' + impactEsc(r.week) + '<br><span style="font-weight:400;font-size:.85em">mesmos projetos</span></th><th class="num">Términos (dias)</th><th class="num">Contribuição no Global</th><th class="num">% da variação</th></tr></thead><tbody>';
-    var compNotes = [];
+    h += '<section class="ir-sec"><h3>Por empresa</h3><div class="ir-tw"><table class="ir-table ir-compact"><thead><tr><th>Empresa</th><th class="num">Projetos</th><th class="num">SPI ' + impactEsc(r.prevWeek) + '</th><th class="num">SPI ' + impactEsc(r.week) + '</th><th class="num" title="SPI da semana só com os projetos que estavam nas duas semanas — tira o efeito de projetos que entraram ou saíram">SPI ' + impactEsc(r.week) + '<br><span style="font-weight:400;font-size:.85em">mesmos projetos</span></th><th class="num">Términos (dias)</th></tr></thead><tbody>';
     r.byCompany.forEach(function(c){
       var chg = c.entered.length || c.left.length;
-      if (chg) compNotes.push(impactEsc(c.company) + ': ' + [c.entered.length ? 'entrou ' + c.entered.map(impactEsc).join(', ') : '', c.left.length ? 'saiu ' + c.left.map(impactEsc).join(', ') : ''].filter(Boolean).join('; '));
       var like = c.spiLike !== null ? '<span class="ir-spi ' + statusOf(c.spiLike) + '">' + fmtSpi(c.spiLike) + '</span>' : '—';
       if (chg && c.spiLike !== null && c.spiP !== null){
         var dl = c.spiLike - c.spiP;
@@ -4348,11 +4346,9 @@ function renderImpactReport(){
       }
       h += '<tr><td><b>' + impactEsc(c.company) + '</b></td><td class="num">' + c.count + '</td><td class="num">' + (c.spiP !== null ? '<span class="ir-spi ' + statusOf(c.spiP) + '">' + fmtSpi(c.spiP) + '</span>' : '—') + '</td><td class="num">' + (c.spiC !== null ? '<span class="ir-spi ' + statusOf(c.spiC) + '">' + fmtSpi(c.spiC) + '</span>' : '—') + '</td>'
         + '<td class="num">' + (chg ? like : '<span style="opacity:.6">= SPI ' + impactEsc(r.week) + '</span>') + '</td>'
-        + '<td class="num">' + impactDays(c.days) + '</td><td class="num ' + (c.contrib < 0 ? 'crit' : (c.contrib > 0 ? 'good' : '')) + '">' + impactSigned(c.contrib, 4) + '</td><td class="num">' + (Math.abs(r.dG) > 0.000005 ? Math.round(c.contrib / r.dG * 100) + '%' : '—') + '</td></tr>';
+        + '<td class="num">' + impactDays(c.days) + '</td></tr>';
     });
-    h += '</tbody></table></div>';
-    if (compNotes.length) h += '<p class="ir-h-note" style="margin:8px 2px 0">Projetos que entraram/saíram nesta semana — ' + compNotes.join(' · ') + '. A coluna "mesmos projetos" mostra o SPI sem eles, para ver se a empresa melhorou ou piorou de fato. O "% da variação" é a fatia de cada empresa na variação do SPI Global (a soma dá 100%).</p>';
-    h += '</section>';
+    h += '</tbody></table></div></section>';
   }
   if (r.bandChanges){
     var bandLbl = { good: 'Bom', warn: 'Atenção', crit: 'Crítico' };
