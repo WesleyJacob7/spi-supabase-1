@@ -2652,41 +2652,40 @@ function targetLabelPos(rows, val){
   var c = cands.find(free) || cands[0];
   return { x: c.x, y: c.y, anchor: c.anchor, box: { l: c.l, r: c.r, t: c.t, b: c.b } };
 }
-// com muitas semanas (ou SPI parecidos) os números dos pontos se sobrepõem: escolhe quais pontos recebem o número
-// e onde (acima ou abaixo do ponto) — o último sempre, o maior e o menor SPI, e os demais só quando cabem sem
-// encostar em outro número, nos rótulos das linhas de meta ou nos próprios pontos
+// todo ponto do histórico recebe o número do SPI. Para os números não se encostarem (muitas semanas ou SPI
+// parecidos), cada um vai na primeira posição livre: logo acima ou abaixo do ponto e, se não couber, um pouco
+// mais afastado; sem nenhuma posição livre, alterna acima/abaixo do ponto (nunca fica sem número)
 function trendLabelIdx(rows){
   var n = rows.length, keep = {};
   if (!n) return keep;
   var pts = rows.map(function(d, i){ return { x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, yMin), trendMax)) }; });
   var boxes = [1, 0.85].map(function(v){ return targetLabelPos(rows, v).box; });
-  var W0 = 30, H0 = 11;
+  var W0 = 26, H0 = 10;
   var boxOf = function(i, dy){ var cy = pts[i].y + dy; return { l: pts[i].x - W0 / 2, r: pts[i].x + W0 / 2, t: cy - H0 + 2, b: cy + 2 }; };
   var hit = function(a, b){ return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t; };
+  // os próprios pontos (raio 5) também contam como obstáculo
+  var dots = pts.map(function(p){ return { l: p.x - 6, r: p.x + 6, t: p.y - 6, b: p.y + 6 }; });
   var placed = [];
-  var ok = function(i, bx){
+  var ok = function(bx){
     if (bx.t < M.top || bx.b > M.top + plotH) return false;
     if (boxes.some(function(b){ return hit(bx, b); })) return false;
+    if (dots.some(function(b){ return hit(bx, b); })) return false;
     if (placed.some(function(p){ return hit(bx, p); })) return false;
     return true;
   };
-  var tryPlace = function(i, spaced){
-    if (keep[i] !== undefined) return;
-    // pontos que não são obrigatórios: um número a cada ~35 px na horizontal, para a linha continuar legível
-    if (spaced && placed.some(function(p){ return Math.abs((p.l + p.r) / 2 - pts[i].x) < W0 + 5; })) return;
-    var above = boxOf(i, -12), below = boxOf(i, 19);
-    if (ok(i, above)){ keep[i] = -12; placed.push(above); }
-    else if (ok(i, below)){ keep[i] = 19; placed.push(below); }
-  };
-  var hi = 0, lo = 0;
-  rows.forEach(function(d, i){ if (d.spi > rows[hi].spi) hi = i; if (d.spi < rows[lo].spi) lo = i; });
-  [n - 1, hi, lo].forEach(function(i){ tryPlace(i, false); });
-  // SPI repetido semana após semana: só a primeira semana de cada valor recebe o número
-  var same = function(a, b){ return Math.abs(rows[a].spi - rows[b].spi) < 0.0005; };
-  for (var i = n - 1; i >= 0; i--){
-    if (i > 0 && same(i, i - 1)) continue;
-    var j = i, dup = false; while (j + 1 < n && same(j + 1, i)){ j++; if (keep[j] !== undefined) dup = true; }   // o valor já aparece na mesma sequência
-    if (!dup) tryPlace(i, true);
+  var OFFS = [-12, 19, -23, 30, -34, 41];
+  for (var i = 0; i < n; i++){
+    var done = false;
+    for (var k = 0; k < OFFS.length && !done; k++){
+      var bx = boxOf(i, OFFS[k]);
+      if (ok(bx)){ keep[i] = OFFS[k]; placed.push(bx); done = true; }
+    }
+    if (!done){
+      // sem posição livre: alterna acima/abaixo, dentro da área do gráfico
+      var dy = (i % 2 === 0) ? -12 : 19, fb = boxOf(i, dy);
+      if (fb.t < M.top) dy = 19; else if (fb.b > M.top + plotH) dy = -12;
+      keep[i] = dy; placed.push(boxOf(i, dy));
+    }
   }
   return keep;
 }
