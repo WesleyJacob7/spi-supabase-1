@@ -5158,6 +5158,17 @@ function initFormListeners(){
     var code = fCode.value.trim();
     if (!code) return;
     var match = DATA.find(function(d){ return d.id === code; });
+    // código compartilhado por mais de um projeto (ex.: 231048 = Lakeside Phase 1A/1B/2; 250315 = Curtis 2A/2H/2K):
+    // preenche só a empresa e deixa o projeto para escolher na lista
+    var sameCode = DATA.filter(function(d){ return d.id === code; }).map(function(d){ return d.project; })
+      .filter(function(v, i, l){ return l.indexOf(v) === i; });
+    if (match && sameCode.length > 1){
+      document.getElementById('fCompany').value = match.company;
+      var fp = document.getElementById('fProject');
+      if (sameCode.indexOf(fp.value.trim()) < 0){ fp.value = ''; fp.focus(); }
+      showToast('O código ' + code + ' tem ' + sameCode.length + ' projetos (' + sameCode.join(', ') + ') — escolha o projeto.', '');
+      return;
+    }
     if (match){
       document.getElementById('fProject').value = match.project;
       document.getElementById('fCompany').value = match.company;
