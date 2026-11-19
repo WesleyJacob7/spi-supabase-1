@@ -373,6 +373,31 @@ function pmNameForProject(project){
   return matches[0].pm_name;
 }
 
+/* ---------- Prime do Controlador.ia (tabela spi_project_primes) ----------
+   Prime de cada projeto (vínculo código do projeto ↔ prime do Controlador.ia).
+   Só aparece na visão do admin, embaixo do código e nome do projeto na tabela;
+   preenchido/alterado no campo "Prime" do formulário de lançamento. */
+var PRIMES = {};
+async function loadPrimes(){
+  PRIMES = {};
+  if (!supabaseClient) return;
+  try {
+    var res = await supabaseClient.from('spi_project_primes').select('*');
+    if (res.error) throw res.error;
+    (res.data || []).forEach(function(r){ PRIMES[r.project] = r; });
+  } catch (err){ console.error('Falha ao carregar os primes:', err); }
+}
+function primeOf(project){ var r = PRIMES[project]; return r && r.prime ? r.prime : ''; }
+async function savePrime(project, code, prime){
+  if (!supabaseClient || !isAdminUser()) return;
+  var cur = PRIMES[project];
+  if ((cur ? cur.prime || '' : '') === prime && (!cur || cur.code === code || !prime)) return;
+  var payload = { project: project, code: code, prime: prime, updated_at: new Date().toISOString() };
+  var res = await supabaseClient.from('spi_project_primes').upsert(payload, { onConflict: 'project' }).select();
+  if (res.error){ console.error('Falha ao salvar o prime:', res.error); showToast('Não consegui salvar o prime: ' + res.error.message, 'error'); return; }
+  PRIMES[project] = Object.assign({}, cur || {}, payload);
+}
+
 /* ---------- Cadastro de PMs (tabela pm_registry) ----------
    Lista de PMs por empresa, usada no campo "PM" do formulário de
    lançamento (select filtrado pela empresa do projeto). O nome e o e-mail
@@ -4965,7 +4990,14 @@ function render(){
         render();
       }
     });
-    tdProj.appendChild(projLink); tr.appendChild(tdProj);
+    tdProj.appendChild(projLink);
+    // Prime do Controlador.ia embaixo do código e nome — só na visão do admin
+    if (isAdminUser() && primeOf(d.project)){
+      var pr = document.createElement('div'); pr.className = 'prime-sub';
+      pr.textContent = 'Prime ' + primeOf(d.project);
+      tdProj.appendChild(pr);
+    }
+    tr.appendChild(tdProj);
 
     var tdCo = document.createElement('td'); tdCo.textContent = d.company; tr.appendChild(tdCo);
 
@@ -5048,6 +5080,8 @@ function openModal(mode, row){
     document.getElementById('fPmEmail').value = row.pm_email || pmEmailForProject(row.project) || '';
     var fPmNameEdit = document.getElementById('fPmName');
     if (fPmNameEdit) fPmNameEdit.value = row.pm_name || pmNameForProject(row.project) || '';
+    var fPrimeEdit = document.getElementById('fPrime');
+    if (fPrimeEdit) fPrimeEdit.value = primeOf(row.project);
   } else {
     document.getElementById('fWeek').value = inputValueFromWeekLabel(state.week);
     document.getElementById('fCr').value = 0;
@@ -5132,6 +5166,8 @@ function initFormListeners(){
       if (fPmEmail && !fPmEmail.value.trim() && match.pm_email) fPmEmail.value = match.pm_email;
       var fPmName = document.getElementById('fPmName');
       if (fPmName && !fPmName.value.trim() && match.pm_name) fPmName.value = match.pm_name;
+      var fPrimeC = document.getElementById('fPrime');
+      if (fPrimeC && !fPrimeC.value.trim()) fPrimeC.value = primeOf(match.project);
       syncPmSelect();
     }
   });
@@ -5223,6 +5259,8 @@ function initFormListeners(){
     var pmEmail = document.getElementById('fPmEmail').value.trim();
     var pmNameEl = document.getElementById('fPmName');
     var pmName = pmNameEl ? pmNameEl.value.trim() : '';
+    var primeEl = document.getElementById('fPrime');
+    var primeVal = primeEl ? primeEl.value.trim() : null;
 
     var errEl = document.getElementById('formError');
     if (!code || !project || !company || !scope || !weekLabel || isNaN(base) || base < 0 || isNaN(pctRaw)){
@@ -5270,6 +5308,7 @@ function initFormListeners(){
     var ok = await persistData(newData);
     setFormBusy(false);
     if (ok){
+      if (primeVal !== null) await savePrime(project, code, primeVal);
       recomputeDerivedLists();
       refreshFilterUI();
       closeModal();
@@ -5393,7 +5432,7 @@ async function boot(){
     DATA = DATA.filter(function(d){ return d.week <= publishedWeek; });
   }
   await loadExcluded();
-  if (isAdminUser()) await loadPmRegistry();
+  if (isAdminUser()){ await loadPmRegistry(); await loadPrimes(); }
   recomputeDerivedLists();
 
   populateDatalists();

@@ -293,6 +293,7 @@ details[open] > .reminder-alert-secondary-title::before{ content:"▾ "; }
 .legend-line{ width:22px; height:0; border-top: 2px dashed var(--text-muted); flex:none; }
 
 .project-pick{ cursor:pointer; }
+.prime-sub{ font-size:11.5px; color: var(--text-muted, #5b6b7c); margin-top:2px; font-variant-numeric: tabular-nums; }
 .project-pick:hover{ text-decoration: underline; text-decoration-color: var(--accent); }
 .project-pick:focus-visible{ outline:2px solid var(--focus-ring); outline-offset:2px; border-radius:3px; }
 tr.row-isolated td{ background: var(--surface-2); }
@@ -1072,6 +1073,10 @@ body.impact-open{ overflow:hidden; }
         <div class="form-field">
           <label for="fProject">Project</label>
           <input type="text" id="fProject" name="project" list="projectList" required autocomplete="off" placeholder="e.g. Mary Ellen">
+        </div>
+        <div class="form-field">
+          <label for="fPrime">Prime (Controlador.ia)</label>
+          <input type="text" id="fPrime" name="prime" autocomplete="off" placeholder="e.g. 001 - Framing">
         </div>
         <div class="form-field">
           <label for="fCompany">Company</label>
