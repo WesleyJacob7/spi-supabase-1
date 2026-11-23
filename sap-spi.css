@@ -253,3 +253,7 @@ html[data-theme="dark"] #companyPills .pill[aria-pressed="true"], html[data-them
 /* usuário logado na barra do topo */
 .shellbar .sb-user{ font-size:12px; color:var(--sap-shell-muted, rgba(255,255,255,.7)) !important; padding:0 12px; white-space:nowrap; border-right:1px solid rgba(255,255,255,.18); margin-left:auto !important; }
 .shellbar .sb-user + .sb-fs{ margin-left:4px !important; }
+
+/* botão Entrar neutro (cinza-azulado da barra do topo), igual ao site dos dossiês */
+.login-card .btn.primary{ background:#354a5f !important; border-color:#354a5f !important; color:#fff !important; }
+.login-card .btn.primary:hover:not(:disabled){ background:#2b3d4f !important; border-color:#2b3d4f !important; }
