@@ -158,6 +158,9 @@ function showDashboard(name){
   if (wrap) wrap.hidden = false;
   var who = document.getElementById('loggedInAs');
   if (who) who.textContent = 'Logado como ' + name;
+  // "Logado como" vai para a barra escura do topo, ao lado do botão Tela cheia
+  var bar = document.querySelector('.shellbar');
+  if (who && bar){ who.classList.add('sb-user'); var fs = bar.querySelector('.sb-fs'); if (fs) bar.insertBefore(who, fs); else bar.appendChild(who); }
   applyRolePermissions();
   boot();
 }

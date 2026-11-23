@@ -249,3 +249,8 @@ html[data-theme="dark"] #companyPills .pill:hover, html[data-theme="dark"] #scop
 html[data-theme="dark"] #companyPills .pill[aria-pressed="true"], html[data-theme="dark"] #scopePills .pill[aria-pressed="true"], html[data-theme="dark"] #emailsCoPills .pill[aria-pressed="true"]{
   background:#4a6a8a !important; border-color:#4a6a8a !important; color:#fff !important;
 }
+
+/* usuário logado na barra do topo */
+.shellbar .sb-user{ font-size:12px; color:var(--sap-shell-muted, rgba(255,255,255,.7)) !important; padding:0 12px; white-space:nowrap; border-right:1px solid rgba(255,255,255,.18); margin-left:16px; }
+.shellbar .sb-user + .sb-fs{ margin-left:4px !important; }
+.shellbar .sb-sub + .sb-user{ margin-left:16px; }
