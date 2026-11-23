@@ -208,3 +208,13 @@ select.wk, textarea.reply-input, .login-field select, .login-field input,
 :root[data-co="JKA"][data-theme="light"] body::after{ background-image:url('brand/jka-logo.png'); background-size:min(55vw,560px); opacity:.055; }
 :root[data-co="Prestige"][data-theme="light"] body::after{ background-image:url('brand/prestige-logo.png'); background-size:min(55vw,520px); opacity:.09; }
 @media print{ body::after{ display:none !important; } }
+
+/* menu do painel no estilo das abas de seção do site dos dossiês */
+.header-menu{ border-bottom:1px solid #e3e7ec; }
+.header-menu .btn.ghost.small{
+  border:0 !important; border-radius:0 !important; background:transparent !important;
+  padding:13px 14px 11px !important; font-size:13px; font-weight:400; color:var(--text-secondary) !important;
+  border-bottom:3px solid transparent !important; box-shadow:none !important;
+}
+.header-menu .btn.ghost.small:hover:not(:disabled){ color:var(--brand-ac, var(--accent)) !important; border-bottom-color:var(--brand-ac, var(--accent)) !important; background:transparent !important; }
+.header-menu .logged-in-as{ font-size:13px; color:var(--text-muted); padding:0 8px; }
