@@ -223,12 +223,18 @@ select.wk, textarea.reply-input, .login-field select, .login-field input,
 @media (max-width:1100px){ .header-menu, .header-menu .header-side-row{ flex-wrap:wrap !important; } }
 
 /* botões de Empresa e Escopo no estilo dos seletores de escopo do dossiê: arredondados, o escolhido preenchido */
-#companyPills .pill, #scopePills .pill{
+#companyPills .pill, #scopePills .pill, #emailsCoPills .pill{
   border:1px solid #d5dae0 !important; border-radius:999px !important; background:#fff !important; color:var(--text-secondary) !important;
   padding:5px 14px !important; font-size:12.5px; font-weight:500; box-shadow:none !important; gap:6px;
 }
-#companyPills .pill:hover, #scopePills .pill:hover{ border-color:var(--brand-ac, #5b738b) !important; color:var(--brand-ac, #354a5f) !important; }
-#companyPills .pill[aria-pressed="true"], #scopePills .pill[aria-pressed="true"]{
+#companyPills .pill:hover, #scopePills .pill:hover, #emailsCoPills .pill:hover{ border-color:var(--brand-ac, #5b738b) !important; color:var(--brand-ac, #354a5f) !important; }
+#companyPills .pill[aria-pressed="true"], #scopePills .pill[aria-pressed="true"], #emailsCoPills .pill[aria-pressed="true"]{
   background:var(--brand-ac, #354a5f) !important; border-color:var(--brand-ac, #354a5f) !important; color:#fff !important;
 }
 #companyPills .pill .dot, #scopePills .pill .dot{ display:none; }
+
+/* seletor de empresa da aba E-mails */
+.emails-co-bar{ display:flex !important; align-items:center; gap:10px; border:0 !important; background:transparent !important; box-shadow:none !important; padding:4px 0 2px !important; margin:0 0 6px !important; }
+#dashWrap[data-view="painel"] > .emails-co-bar{ display:none !important; }
+.emails-co-bar .emails-co-lbl{ font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; }
+.emails-co-bar .pillset{ display:flex; gap:6px; }

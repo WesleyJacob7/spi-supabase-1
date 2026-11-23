@@ -686,7 +686,7 @@ footer.foot{ margin-top: 26px; font-size: 12px; color: var(--text-muted); text-a
   .report-columns{ grid-template-columns: 1fr; }
 }
 </style>
-<link rel="stylesheet" href="sap-spi.css?v=20261123c">
+<link rel="stylesheet" href="sap-spi.css?v=20261123d">
 <style id="impactStyles">
 /* ---------- Análise de impacto no SPI — mesmo visual (SAP Fiori) do painel ---------- */
 body.impact-open{ overflow:hidden; }
@@ -865,6 +865,7 @@ body.impact-open{ overflow:hidden; }
     </div>
   </nav>
 
+<div class="reminder-alert-card emails-co-bar" id="emailsCoBar"><span class="emails-co-lbl">Empresa</span><div class="pillset" id="emailsCoPills"><button type="button" class="pill" data-co="">Todas</button><button type="button" class="pill" data-co="JKA">JKA</button><button type="button" class="pill" data-co="Prestige">Prestige</button></div></div>
 <div class="card reminder-alert-card fade-in" id="emailDueAlertCard" hidden>
     <details class="reminder-alert-main" id="emailDueAlertMainSection">
       <summary class="reminder-alert-head">
@@ -1371,6 +1372,7 @@ body.impact-open{ overflow:hidden; }
   function show(v){ wrap.setAttribute('data-view',v);
     [].forEach.call(tabs.querySelectorAll('.view-tab'),function(b){ b.classList.toggle('active',b.getAttribute('data-view')===v); });
     try{ localStorage.setItem(KEY,v); }catch(e){}
+    try{ if(typeof applyBrand==='function') applyBrand(); }catch(e){}
     window.dispatchEvent(new Event('resize')); }
   tabs.addEventListener('click',function(e){ var b=e.target.closest('.view-tab'); if(b) show(b.getAttribute('data-view')); });
   var saved='painel'; try{ saved=localStorage.getItem(KEY)||'painel'; }catch(e){}

@@ -1398,10 +1398,28 @@ function weekForProjectDate(project, dateIso){
   var hist = historicalRowAtOrBefore(project, dateIso);
   return hist ? hist.week : null;
 }
+/* empresa escolhida na aba E-mails ('' = todas): filtra os três cards e põe a logo da empresa */
+var emailsCo = ''; try { emailsCo = localStorage.getItem('spi-emails-co') || ''; } catch (e){}
+function emailsView(){ var w = document.getElementById('dashWrap'); return !!(w && w.getAttribute('data-view') === 'emails'); }
+function setEmailsCo(co){
+  emailsCo = co || ''; try { localStorage.setItem('spi-emails-co', emailsCo); } catch (e){}
+  [].forEach.call(document.querySelectorAll('#emailsCoPills .pill'), function(b){ b.setAttribute('aria-pressed', String((b.getAttribute('data-co') || '') === emailsCo)); });
+  try { renderEmailDueAlert(); } catch (e){}
+  try { renderReminderAlert(); } catch (e){}
+  try { renderNoReplyAlert(); } catch (e){}
+  try { applyBrand(); } catch (e){}
+}
+function initEmailsCoBar(){
+  var bar = document.getElementById('emailsCoBar'); if (!bar) return;
+  if (currentUserCompanyScope){ bar.remove(); return; }
+  bar.addEventListener('click', function(e){ var b = e.target.closest('.pill'); if (b) setEmailsCo(b.getAttribute('data-co')); });
+  setEmailsCo(emailsCo);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initEmailsCoBar); else initEmailsCoBar();
 function latestWeekRows(){
   if (!weeks.length) return [];
   var latest = weeks[weeks.length - 1];
-  return DATA.filter(function(d){ return d.week === latest && !isHiddenRow(d); });
+  return DATA.filter(function(d){ return d.week === latest && !isHiddenRow(d) && (!emailsCo || d.company === emailsCo); });
 }
 
 /* ---------- ciclo mensal do e-mail original ("primeiro e-mail") ----------
@@ -4810,7 +4828,8 @@ var BRAND = { JKA: ['JKA', 'CONSTRUCTION INC.', 'brand/jka-simbolo-branco.png'],
 var shellTxt0 = null;
 function applyBrand(){
   var co = currentUserCompanyScope || null;
-  if (!co && state.companies && state.companies.size === 1){
+  if (!co && emailsView()) co = emailsCo || null;
+  else if (!co && state.companies && state.companies.size === 1){
     var all = {}; (DATA || []).forEach(function(d){ if (d && d.company) all[d.company] = 1; });
     if (Object.keys(all).length > 1) co = Array.from(state.companies)[0];
   }
