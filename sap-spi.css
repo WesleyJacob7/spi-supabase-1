@@ -238,3 +238,14 @@ select.wk, textarea.reply-input, .login-field select, .login-field input,
 #dashWrap[data-view="painel"] > .emails-co-bar{ display:none !important; }
 .emails-co-bar .emails-co-lbl{ font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; }
 .emails-co-bar .pillset{ display:flex; gap:6px; }
+
+/* modo escuro: botões de Empresa/Escopo sem fundo branco, contorno discreto e texto claro */
+html[data-theme="dark"] #companyPills .pill, html[data-theme="dark"] #scopePills .pill, html[data-theme="dark"] #emailsCoPills .pill{
+  background:transparent !important; border-color:rgba(255,255,255,.18) !important; color:#c9d2dc !important;
+}
+html[data-theme="dark"] #companyPills .pill:hover, html[data-theme="dark"] #scopePills .pill:hover, html[data-theme="dark"] #emailsCoPills .pill:hover{
+  background:rgba(255,255,255,.06) !important; border-color:rgba(255,255,255,.35) !important; color:#fff !important;
+}
+html[data-theme="dark"] #companyPills .pill[aria-pressed="true"], html[data-theme="dark"] #scopePills .pill[aria-pressed="true"], html[data-theme="dark"] #emailsCoPills .pill[aria-pressed="true"]{
+  background:#4a6a8a !important; border-color:#4a6a8a !important; color:#fff !important;
+}
