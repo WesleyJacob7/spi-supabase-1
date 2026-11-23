@@ -183,3 +183,28 @@ select.wk, textarea.reply-input, .login-field select, .login-field input,
 /* ---- diálogos ---- */
 .modal-title, .login-title{ font-weight: 600; letter-spacing: 0; }
 .modal-title{ font-size: 17px; }
+
+/* ===== visual do site dos dossiês (modo claro): fundo branco, sem quadros, cor e logo da empresa ao filtrar ===== */
+:root[data-theme="light"] body{ background:#fff !important; }
+:root[data-theme="light"]{ --page-bg:#ffffff; }
+:root[data-theme="light"] .card, :root[data-theme="light"] .table-card, :root[data-theme="light"] .kpi,
+:root[data-theme="light"] .filters, :root[data-theme="light"] .breakdown-card{
+  background:transparent !important; border:0 !important; box-shadow:none !important; border-radius:0 !important;
+}
+:root[data-theme="light"] .card, :root[data-theme="light"] .table-card{ border-top:1px solid #e3e7ec !important; padding-left:0 !important; padding-right:0 !important; }
+:root[data-theme="light"] .filters{ border-top:1px solid #e3e7ec !important; border-bottom:1px solid #e3e7ec !important; padding-left:0 !important; padding-right:0 !important; }
+:root[data-theme="light"] .kpi{ border-left:3px solid var(--brand-ac, #5b738b) !important; padding-left:14px !important; }
+:root[data-theme="light"] .shellbar{ background:var(--brand-shell, #354a5f); }
+:root[data-co="JKA"]{ --brand-shell:#0a4f96; --brand-ac:#0a6ed1; }
+:root[data-co="Prestige"]{ --brand-shell:#8f4300; --brand-ac:#b85500; }
+:root[data-co] .shellbar{ background:var(--brand-shell) !important; }
+.shellbar .sb-title{ display:flex; align-items:center; white-space:nowrap; }
+.shellbar .sb-mark{ height:24px; width:auto; margin-right:10px; }
+.shellbar .sb-co{ font-weight:600; letter-spacing:.06em; font-size:13.5px; }
+.shellbar .sb-co2{ font-weight:400; letter-spacing:.08em; font-size:11px; margin-left:6px; opacity:.85; }
+:root[data-co="JKA"][data-theme="light"] body::after, :root[data-co="Prestige"][data-theme="light"] body::after{
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:9999; background-repeat:no-repeat; background-position:center 60%;
+}
+:root[data-co="JKA"][data-theme="light"] body::after{ background-image:url('brand/jka-logo.png'); background-size:min(55vw,560px); opacity:.055; }
+:root[data-co="Prestige"][data-theme="light"] body::after{ background-image:url('brand/prestige-logo.png'); background-size:min(55vw,520px); opacity:.09; }
+@media print{ body::after{ display:none !important; } }

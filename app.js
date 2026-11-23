@@ -1048,7 +1048,15 @@ function copyProjectChartToClipboard(project){
     return Promise.resolve(false);
   }
   try {
-    var built = buildEmailChartSvg(project);
+    // a imagem do e-mail sai sempre no tema escuro, igual às enviadas antes (independe do tema da tela)
+    var themeWas = document.documentElement.getAttribute('data-theme'), coWas = document.documentElement.getAttribute('data-co');
+    document.documentElement.setAttribute('data-theme', 'dark'); document.documentElement.removeAttribute('data-co');
+    var built;
+    try { built = buildEmailChartSvg(project); }
+    finally {
+      if (themeWas) document.documentElement.setAttribute('data-theme', themeWas); else document.documentElement.removeAttribute('data-theme');
+      if (coWas) document.documentElement.setAttribute('data-co', coWas);
+    }
     return svgElementToPngBlob(built.svg, built.width, built.height, 2)
       .then(function(blob){
         return navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
@@ -4782,7 +4790,28 @@ function evoSmoothPath(p){
 function escapeHtmlEvo(v){ return String(v === null || v === undefined ? '' : v).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
 /* ---------- main render ---------- */
+/* marca da empresa: só quando a visão é de uma empresa (site da empresa ou filtro de uma só); visão geral fica neutra */
+var BRAND = { JKA: ['JKA', 'CONSTRUCTION INC.', 'brand/jka-simbolo-branco.png'], Prestige: ['PRESTIGE', 'CONSTRUCTION GROUP', 'brand/prestige-simbolo-branco.png'] };
+var shellTxt0 = null;
+function applyBrand(){
+  var co = currentUserCompanyScope || null;
+  if (!co && state.companies && state.companies.size === 1){
+    var all = {}; (DATA || []).forEach(function(d){ if (d && d.company) all[d.company] = 1; });
+    if (Object.keys(all).length > 1) co = Array.from(state.companies)[0];
+  }
+  if (!BRAND[co]) co = null;
+  var root = document.documentElement;
+  if (co) root.setAttribute('data-co', co); else root.removeAttribute('data-co');
+  var t = document.querySelector('.shellbar .sb-title'), sub = document.querySelector('.shellbar .sb-sub');
+  if (!t) return;
+  if (!shellTxt0) shellTxt0 = { t: t.innerHTML, s: sub ? sub.innerHTML : '' };
+  if (!co){ t.innerHTML = shellTxt0.t; if (sub) sub.innerHTML = shellTxt0.s; return; }
+  var b = BRAND[co];
+  t.innerHTML = '<img class="sb-mark" src="' + b[2] + '" alt=""><span class="sb-co">' + b[0] + '</span><span class="sb-co2">' + b[1] + '</span>';
+  if (sub) sub.textContent = 'Dashboard SPI';
+}
 function render(){
+  try { applyBrand(); } catch (e){}
   var rows = currentRows();
   updateWeekDateBox();
   var svg = document.getElementById('chart');
@@ -5403,6 +5432,8 @@ function updateThemeToggleLabel(){
   btn.textContent = currentTheme() === 'dark' ? 'Modo claro' : 'Modo escuro';
 }
 function initTheme(){
+  // o painel abre sempre no modo claro (visual do site dos dossiês); o botão continua alternando para o escuro
+  document.documentElement.setAttribute('data-theme', 'light');
   updateThemeToggleLabel();
   var btn = document.getElementById('themeToggle');
   if (btn){
