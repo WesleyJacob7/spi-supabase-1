@@ -4790,6 +4790,21 @@ function evoSmoothPath(p){
 function escapeHtmlEvo(v){ return String(v === null || v === undefined ? '' : v).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
 /* ---------- main render ---------- */
+/* tela cheia (sem abas, barra de endereços e favoritos do navegador): botão no canto direito da barra do topo */
+(function(){
+  function add(){
+    var bar = document.querySelector('.shellbar'); if (!bar || !document.documentElement.requestFullscreen || bar.querySelector('.sb-fs')) return;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'sb-fs';
+    b.style.cssText = 'margin-left:auto;background:transparent;border:0;color:inherit;font:inherit;font-size:12.5px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:6px 8px;border-radius:4px';
+    var ON = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    var OFF = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+    function upd(){ var on = !!document.fullscreenElement; b.innerHTML = (on ? OFF : ON) + '<span>' + (on ? 'Sair da tela cheia' : 'Tela cheia') + '</span>'; b.title = on ? 'Sair da tela cheia (Esc)' : 'Ver em tela cheia, sem as barras do navegador'; }
+    b.addEventListener('click', function(){ if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(function(){}); });
+    document.addEventListener('fullscreenchange', upd); upd();
+    bar.appendChild(b);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', add); else add();
+})();
 /* marca da empresa: só quando a visão é de uma empresa (site da empresa ou filtro de uma só); visão geral fica neutra */
 var BRAND = { JKA: ['JKA', 'CONSTRUCTION INC.', 'brand/jka-simbolo-branco.png'], Prestige: ['PRESTIGE', 'CONSTRUCTION GROUP', 'brand/prestige-simbolo-branco.png'] };
 var shellTxt0 = null;
