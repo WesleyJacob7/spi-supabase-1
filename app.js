@@ -2729,6 +2729,7 @@ function trendLabelIdx(rows){
   var pts = rows.map(function(d, i){ return { x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, trendMin), trendMax)) }; });
   var boxes = [1, 0.85].map(function(v){ return targetLabelPos(rows, v).box; });
   var W0 = 26, H0 = 10;
+  var lines = [1, 0.85].map(function(v){ return tScale(v); });
   var boxOf = function(i, dy){ var cy = pts[i].y + dy; return { l: pts[i].x - W0 / 2, r: pts[i].x + W0 / 2, t: cy - H0 + 2, b: cy + 2 }; };
   var hit = function(a, b){ return a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t; };
   // os próprios pontos (raio 5) também contam como obstáculo
@@ -2737,6 +2738,9 @@ function trendLabelIdx(rows){
   var ok = function(bx){
     if (bx.t < M.top || bx.b > M.top + plotH) return false;
     if (boxes.some(function(b){ return hit(bx, b); })) return false;
+    // nem em cima das linhas tracejadas de 1,00 e 0,85 (com a escala ampliada
+    // de projetos novos, um SPI de 0,99 fica colado na linha de 1,00)
+    if (lines.some(function(ly){ return bx.t - 1 < ly && bx.b + 1 > ly; })) return false;
     if (dots.some(function(b){ return hit(bx, b); })) return false;
     if (placed.some(function(p){ return hit(bx, p); })) return false;
     return true;
