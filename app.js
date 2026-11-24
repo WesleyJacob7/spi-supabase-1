@@ -1096,7 +1096,7 @@ function projectCompany(project){
   return '';
 }
 // Largura com que a imagem aparece no e-mail (px) — o PNG sai nesse tamanho exato.
-var EMAIL_CHART_DISPLAY_W = 780;
+var EMAIL_CHART_DISPLAY_W = 840;
 function copyProjectChartToClipboard(project){
   if (!navigator.clipboard || typeof window.ClipboardItem !== 'function'){
     return Promise.resolve(false);
