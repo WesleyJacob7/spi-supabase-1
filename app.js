@@ -881,7 +881,8 @@ function readCssVar(name, fallback){
     return (v && v.trim()) ? v.trim() : fallback;
   } catch (e){ return fallback; }
 }
-function buildEmailChartSvg(project){
+function buildEmailChartSvg(project, opts){
+  opts = opts || {};
   var trendRows = projectTrendRows(project);
   trendMax = trendYMax(trendRows);
   var svgNS = 'http://www.w3.org/2000/svg';
@@ -924,6 +925,16 @@ function buildEmailChartSvg(project){
 
   node('rect', { x: 0, y: 0, width: totalW, height: totalH, fill: c.bg });
   node('rect', { x: 0.5, y: 0.5, width: totalW - 1, height: totalH - 1, fill: 'none', stroke: c.border });
+
+  // logo da empresa no fundo do gráfico (igual aos sites no modo claro) — só
+  // nos e-mails de projetos novos (ver emailChartStyle)
+  if (opts.logo && opts.logo.href){
+    var lgW = Math.min(plotW * 0.62, 560), lgH = lgW * opts.logo.ratio;
+    if (lgH > plotH * 0.92){ lgH = plotH * 0.92; lgW = lgH / opts.logo.ratio; }
+    var lgImg = node('image', { x: pad + M.left + (plotW - lgW) / 2, y: headerH + M.top + (plotH - lgH) / 2, width: lgW, height: lgH, opacity: opts.logo.opacity, preserveAspectRatio: 'xMidYMid meet' });
+    lgImg.setAttribute('href', opts.logo.href);
+    lgImg.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', opts.logo.href);
+  }
 
   var title = node('text', { x: pad, y: pad + 16, 'font-family': fontFamily, 'font-size': 18, 'font-weight': 700, fill: c.textPrimary });
   title.textContent = 'Histórico de SPI — ' + project;
@@ -1046,28 +1057,79 @@ function svgElementToPngBlob(svgEl, width, height, scale){
 // transferência. Resolve para true se a cópia deu certo, false caso o
 // navegador não suporte (ou algo falhe) — nesse caso o e-mail ainda é aberto
 // normalmente, só sem a cópia automática.
+/* Logos das empresas como data URL (o SVG do e-mail vira imagem via blob e não
+   carrega arquivos externos). Carregadas no início para estarem prontas no
+   clique — a cópia para a área de transferência precisa sair logo após o clique. */
+var EMAIL_LOGOS = {};
+(function preloadEmailLogos(){
+  var files = { 'JKA': { src: 'brand/jka-logo.png', opacity: 0.055 }, 'Prestige': { src: 'brand/prestige-logo.png', opacity: 0.09 } };
+  Object.keys(files).forEach(function(co){
+    try {
+      fetch(files[co].src).then(function(r){ return r.blob(); }).then(function(b){
+        var fr = new FileReader();
+        fr.onload = function(){
+          var im = new Image();
+          im.onload = function(){ EMAIL_LOGOS[co] = { href: fr.result, ratio: im.naturalHeight / im.naturalWidth, opacity: files[co].opacity }; };
+          im.src = fr.result;
+        };
+        fr.readAsDataURL(b);
+      }).catch(function(){});
+    } catch (e){}
+  });
+})();
+// Estilo do gráfico do e-mail: projetos que já recebiam o e-mail de SPI antes
+// de 24/11/2026 continuam no modo escuro (para o histórico de e-mails não
+// mudar de cara); projetos novos (primeiro e-mail a partir dessa data, ou
+// nunca enviado) saem no modo claro com a logo da empresa no fundo.
+var EMAIL_LIGHT_SINCE = new Date('2026-11-24T00:00:00-03:00');
+function emailChartStyle(project){
+  var s = pmEmailLogSummary && pmEmailLogSummary[project];
+  var first = s && s.firstEmailSent ? new Date(s.firstEmailSent) : null;
+  DATA.forEach(function(d){
+    if (d.project === project && d.email_sent_at){ var t = new Date(d.email_sent_at); if (!first || t < first) first = t; }
+  });
+  return (first && first < EMAIL_LIGHT_SINCE) ? 'dark' : 'light';
+}
+function projectCompany(project){
+  for (var i = 0; i < DATA.length; i++){ if (DATA[i].project === project && DATA[i].company) return DATA[i].company; }
+  return '';
+}
+// Largura com que a imagem aparece no e-mail (px); o PNG é gerado em 3x para
+// ficar nítido, e o HTML copiado junto diz ao Outlook o tamanho de exibição.
+var EMAIL_CHART_DISPLAY_W = 900, EMAIL_CHART_SCALE = 3;
 function copyProjectChartToClipboard(project){
   if (!navigator.clipboard || typeof window.ClipboardItem !== 'function'){
     return Promise.resolve(false);
   }
   try {
-    // a imagem do e-mail sai sempre no tema escuro, igual às enviadas antes (independe do tema da tela)
+    var style = emailChartStyle(project), co = projectCompany(project);
     var themeWas = document.documentElement.getAttribute('data-theme'), coWas = document.documentElement.getAttribute('data-co');
-    document.documentElement.setAttribute('data-theme', 'dark'); document.documentElement.removeAttribute('data-co');
+    document.documentElement.setAttribute('data-theme', style);
+    if (style === 'light' && co) document.documentElement.setAttribute('data-co', co); else document.documentElement.removeAttribute('data-co');
     var built;
-    try { built = buildEmailChartSvg(project); }
+    try { built = buildEmailChartSvg(project, { logo: style === 'light' ? EMAIL_LOGOS[co] : null }); }
     finally {
       if (themeWas) document.documentElement.setAttribute('data-theme', themeWas); else document.documentElement.removeAttribute('data-theme');
-      if (coWas) document.documentElement.setAttribute('data-co', coWas);
+      if (coWas) document.documentElement.setAttribute('data-co', coWas); else document.documentElement.removeAttribute('data-co');
     }
-    return svgElementToPngBlob(built.svg, built.width, built.height, 2)
-      .then(function(blob){
-        return navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]);
-      })
+    var dispW = EMAIL_CHART_DISPLAY_W, dispH = Math.round(built.height * dispW / built.width);
+    var pngP = svgElementToPngBlob(built.svg, built.width, built.height, EMAIL_CHART_SCALE);
+    var htmlP = pngP.then(function(blob){
+      return new Promise(function(res){
+        var fr = new FileReader();
+        fr.onload = function(){
+          res(new Blob(['<img src="' + fr.result + '" width="' + dispW + '" height="' + dispH + '" style="width:' + dispW + 'px;height:' + dispH + 'px" alt="Histórico de SPI — ' + project.replace(/"/g, '') + '">'], { type: 'text/html' }));
+        };
+        fr.readAsDataURL(blob);
+      });
+    });
+    return navigator.clipboard.write([ new ClipboardItem({ 'image/png': pngP, 'text/html': htmlP }) ])
       .then(function(){ return true; })
       .catch(function(err){
         console.warn('Não foi possível copiar o gráfico de SPI para a área de transferência:', err);
-        return false;
+        // navegador sem suporte a promessas/HTML no ClipboardItem: copia só o PNG
+        return pngP.then(function(blob){ return navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]); })
+          .then(function(){ return true; }).catch(function(){ return false; });
       });
   } catch (e){
     console.warn('Não foi possível gerar o gráfico de SPI para o e-mail:', e);
