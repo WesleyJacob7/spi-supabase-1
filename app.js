@@ -939,7 +939,7 @@ function buildEmailChartSvg(project, opts){
   var title = node('text', { x: pad, y: pad + 16, 'font-family': fontFamily, 'font-size': 18, 'font-weight': 700, fill: c.textPrimary });
   title.textContent = 'Histórico de SPI — ' + project;
 
-  var note = node('text', { x: pad, y: pad + 34, 'font-family': fontFamily, 'font-size': 12, fill: c.textMuted });
+  var note = node('text', { x: pad, y: pad + 34, 'font-family': fontFamily, 'font-size': 13, fill: c.textMuted });
   note.textContent = 'SPI de "' + project + '" em cada semana com avanço registrado (' + trendRows.length + ' semana(s)).';
 
   // legenda (mesmos textos/cores do painel)
@@ -951,12 +951,12 @@ function buildEmailChartSvg(project, opts){
   var lx = pad, ly = pad + 56;
   legendItems.forEach(function(it){
     node('circle', { cx: lx + 5, cy: ly - 4, r: 5, fill: it.color });
-    var t = node('text', { x: lx + 15, y: ly, 'font-family': fontFamily, 'font-size': 12, 'font-weight': 500, fill: c.textSecondary });
+    var t = node('text', { x: lx + 15, y: ly, 'font-family': fontFamily, 'font-size': 13, 'font-weight': 500, fill: c.textSecondary });
     t.textContent = it.label;
-    lx += 22 + it.label.length * 6.3;
+    lx += 22 + it.label.length * 6.8;
   });
   node('line', { x1: lx, x2: lx + 20, y1: ly - 4, y2: ly - 4, stroke: c.textMuted, 'stroke-width': 2, 'stroke-dasharray': '3 4' });
-  var dtxt = node('text', { x: lx + 28, y: ly, 'font-family': fontFamily, 'font-size': 12, 'font-weight': 500, fill: c.textSecondary });
+  var dtxt = node('text', { x: lx + 28, y: ly, 'font-family': fontFamily, 'font-size': 13, 'font-weight': 500, fill: c.textSecondary });
   dtxt.textContent = 'Faixas de SPI (1,00 / 0,85)';
 
   // gráfico propriamente dito, deslocado abaixo do cabeçalho/legenda — mesma
@@ -970,7 +970,7 @@ function buildEmailChartSvg(project, opts){
   for (var yv = yMin; yv <= trendMax + 0.0001; yv += 0.1){
     var gy = tScale(yv);
     node('line', { x1: M.left, x2: M.left + plotW, y1: gy, y2: gy, stroke: c.hairline, 'stroke-width': 1 }, g);
-    var t2 = node('text', { x: M.left - 10, y: gy + 3.5, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, fill: c.textMuted }, g);
+    var t2 = node('text', { x: M.left - 10, y: gy + 3.5, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted }, g);
     t2.textContent = yv.toFixed(2);
   }
 
@@ -979,7 +979,7 @@ function buildEmailChartSvg(project, opts){
     if (i % xLabelStep !== 0 && i !== trendRows.length - 1) return;
     var x = trendXScale(i, trendRows.length);
     var y = M.top + plotH + 16;
-    var xt = node('text', { x: x, y: y, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, fill: c.textMuted,
+    var xt = node('text', { x: x, y: y, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted,
       transform: 'rotate(-40 ' + x + ' ' + y + ')' }, g);
     xt.textContent = fmtDateMDY(d.date);
   });
@@ -990,18 +990,18 @@ function buildEmailChartSvg(project, opts){
   var ty = tScale(1);
   node('line', { x1: M.left, x2: M.left + plotW, y1: ty, y2: ty, stroke: c.textMuted, 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }, g);
   var tp1 = targetLabelPos(trendRows, 1);
-  var lbl = node('text', { x: tp1.x, y: tp1.y, 'text-anchor': tp1.anchor, 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
+  var lbl = node('text', { x: tp1.x, y: tp1.y, 'text-anchor': tp1.anchor, 'font-family': fontFamily, 'font-size': 10, 'font-weight': 500, fill: c.textSecondary }, g);
   lbl.textContent = TARGET_TEXTS[1];
 
   var ty2 = tScale(0.85);
   node('line', { x1: M.left, x2: M.left + plotW, y1: ty2, y2: ty2, stroke: c.textMuted, 'stroke-width': 1.5, 'stroke-dasharray': '3 4' }, g);
   var tp2 = targetLabelPos(trendRows, 0.85);
-  var lbl2 = node('text', { x: tp2.x, y: tp2.y, 'text-anchor': tp2.anchor, 'font-family': fontFamily, 'font-size': 9, 'font-weight': 500, fill: c.textSecondary }, g);
+  var lbl2 = node('text', { x: tp2.x, y: tp2.y, 'text-anchor': tp2.anchor, 'font-family': fontFamily, 'font-size': 10, 'font-weight': 500, fill: c.textSecondary }, g);
   lbl2.textContent = TARGET_TEXTS[0.85];
 
-  var xt2 = node('text', { x: M.left + plotW / 2, y: H - 6, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 10, fill: c.textMuted }, g);
+  var xt2 = node('text', { x: M.left + plotW / 2, y: H - 6, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted }, g);
   xt2.textContent = 'Data de referência';
-  var yt2 = node('text', { x: -(M.top + plotH / 2), y: 16, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 10, fill: c.textMuted,
+  var yt2 = node('text', { x: -(M.top + plotH / 2), y: 16, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted,
     transform: 'rotate(-90)' }, g);
   yt2.textContent = 'SPI (índice de desempenho de prazo)';
 
@@ -1019,7 +1019,7 @@ function buildEmailChartSvg(project, opts){
       var color = st === 'good' ? c.good : st === 'warn' ? c.warnMark : c.crit;
       node('circle', { cx: cx, cy: cy, r: 5, fill: color, stroke: c.bg, 'stroke-width': 2 }, g);
       if (showLbl[i] === undefined) return;
-      var vt = node('text', { x: cx, y: cy + showLbl[i], 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 9, 'font-weight': 600, fill: c.textSecondary }, g);
+      var vt = node('text', { x: cx, y: cy + showLbl[i], 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 10, 'font-weight': 600, fill: c.textSecondary }, g);
       vt.textContent = fmtSpi(d.spi);
     });
   }
@@ -1094,9 +1094,8 @@ function projectCompany(project){
   for (var i = 0; i < DATA.length; i++){ if (DATA[i].project === project && DATA[i].company) return DATA[i].company; }
   return '';
 }
-// Largura com que a imagem aparece no e-mail (px); o PNG é gerado em 4x para
-// ficar nítido, e o HTML copiado junto diz ao Outlook o tamanho de exibição.
-var EMAIL_CHART_DISPLAY_W = 760, EMAIL_CHART_SCALE = 4;
+// Largura com que a imagem aparece no e-mail (px) — o PNG sai nesse tamanho exato.
+var EMAIL_CHART_DISPLAY_W = 780;
 function copyProjectChartToClipboard(project){
   if (!navigator.clipboard || typeof window.ClipboardItem !== 'function'){
     return Promise.resolve(false);
@@ -1112,22 +1111,17 @@ function copyProjectChartToClipboard(project){
       if (themeWas) document.documentElement.setAttribute('data-theme', themeWas); else document.documentElement.removeAttribute('data-theme');
       if (coWas) document.documentElement.setAttribute('data-co', coWas); else document.documentElement.removeAttribute('data-co');
     }
+    // o Outlook cola a imagem no tamanho em pixels dela (e reduzir lá dentro
+    // borra o gráfico); por isso o PNG já sai exatamente no tamanho de
+    // exibição, desenhado direto do vetor nesse tamanho (texto e linhas nítidos)
     var dispW = EMAIL_CHART_DISPLAY_W, dispH = Math.round(built.height * dispW / built.width);
-    var pngP = svgElementToPngBlob(built.svg, built.width, built.height, EMAIL_CHART_SCALE);
-    var htmlP = pngP.then(function(blob){
-      return new Promise(function(res){
-        var fr = new FileReader();
-        fr.onload = function(){
-          res(new Blob(['<img src="' + fr.result + '" width="' + dispW + '" height="' + dispH + '" style="width:' + dispW + 'px;height:' + dispH + 'px" alt="Histórico de SPI — ' + project.replace(/"/g, '') + '">'], { type: 'text/html' }));
-        };
-        fr.readAsDataURL(blob);
-      });
-    });
-    return navigator.clipboard.write([ new ClipboardItem({ 'image/png': pngP, 'text/html': htmlP }) ])
+    built.svg.setAttribute('width', dispW); built.svg.setAttribute('height', dispH);
+    built.svg.setAttribute('text-rendering', 'geometricPrecision');
+    var pngP = svgElementToPngBlob(built.svg, dispW, dispH, 1);
+    return navigator.clipboard.write([ new ClipboardItem({ 'image/png': pngP }) ])
       .then(function(){ return true; })
       .catch(function(err){
         console.warn('Não foi possível copiar o gráfico de SPI para a área de transferência:', err);
-        // navegador sem suporte a promessas/HTML no ClipboardItem: copia só o PNG
         return pngP.then(function(blob){ return navigator.clipboard.write([ new ClipboardItem({ 'image/png': blob }) ]); })
           .then(function(){ return true; }).catch(function(){ return false; });
       });
