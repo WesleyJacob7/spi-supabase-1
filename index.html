@@ -453,16 +453,19 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 .spi-evo-card{ margin-top: 22px; margin-bottom: 22px; }
 .spi-evo-chart{ width:100%; margin: 8px 0 6px; }
 .spi-evo-chart svg{ width:100%; height:auto; display:block; overflow:visible; }
+#spiEvolutionCard table{ font-size:12.5px; }
+#spiEvolutionCard .bd-val, #spiEvolutionCard .evo-delta{ font-weight:500 !important; }
 .spi-evo-chart text{ font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 11px; fill: var(--text-muted); }
-.spi-evo-chart .evo-axis{ stroke: var(--hairline); stroke-width:1; }
+.spi-evo-chart .evo-axis{ stroke: var(--hairline); stroke-width:1; opacity:.7; }
 .spi-evo-chart .evo-ref{ stroke: var(--text-muted); stroke-width:1; stroke-dasharray: 4 4; opacity:.7; }
 .spi-evo-chart .evo-line{ fill:none; stroke: var(--accent); stroke-width:1.5; stroke-linejoin:round; stroke-linecap:round; }
-.spi-evo-chart .evo-area{ fill: var(--accent); opacity:.08; stroke:none; }
+.spi-evo-chart .evo-area{ fill: var(--accent); opacity:.05; stroke:none; }
 .spi-evo-chart .evo-dot{ stroke: var(--surface-1); stroke-width:1; transition: r .12s ease; cursor: default; }
 .spi-evo-chart .evo-dot:hover{ r: 4.5; }
 .spi-evo-chart .evo-dot.sel{ stroke: var(--accent); stroke-width:1.5; }
 .spi-evo-chart .evo-sel-ring{ fill:none; stroke: var(--accent); stroke-width:1; opacity:.35; }
-.spi-evo-chart .evo-panel-label{ font-weight:600; fill: var(--text-secondary); }
+.spi-evo-chart .evo-panel-label{ font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:.06em; fill: var(--text-muted); }
+.spi-evo-chart .evo-reflab{ font-size:10.5px; fill: var(--text-muted); }
 .spi-evo-table-wrap{ max-height: 320px; overflow-y:auto; }
 .spi-evo-table tr.sel td{ background: var(--surface-2); font-weight:600; }
 .evo-delta.good{ color: var(--status-good); font-weight:600; }
@@ -471,7 +474,7 @@ table.mini-table tbody tr:hover td{ background: transparent; }
 /* destaque ao passar o mouse na evolução do SPI global */
 .spi-evo-chart .evo-hit{ fill: transparent; cursor: crosshair; }
 .spi-evo-chart .evo-guide{ stroke: var(--text-muted); stroke-width:1; stroke-dasharray: 2 3; opacity:0; pointer-events:none; }
-.spi-evo-chart .evo-hl{ opacity:0; pointer-events:none; font-weight:700; font-size:12px; paint-order: stroke; stroke: var(--surface-1); stroke-width:4px; stroke-linejoin: round; }
+.spi-evo-chart .evo-hl{ opacity:0; pointer-events:none; font-weight:600; font-size:11.5px; paint-order: stroke; stroke: var(--surface-1); stroke-width:4px; stroke-linejoin: round; }
 .spi-evo-chart .evo-hl-date{ fill: var(--text-primary); font-weight:600; }
 .spi-evo-chart .evo-hl-ring{ fill:none; stroke-width:2; opacity:0; pointer-events:none; }
 .spi-evo-chart .evo-xlab{ pointer-events:none; transition: opacity .12s ease; }

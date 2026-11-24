@@ -4674,6 +4674,8 @@ function fmtSignedPct(p){
   if (Math.abs(p) < 0.05) return '0,0%';
   return (p > 0 ? '+' : '−') + Math.abs(p).toFixed(1).replace('.', ',') + '%';
 }
+var evoResizeT = null;
+window.addEventListener('resize', function(){ clearTimeout(evoResizeT); evoResizeT = setTimeout(function(){ try { renderSpiEvolution(); } catch (e){} }, 200); });
 function renderSpiEvolution(){
   var card = document.getElementById('spiEvolutionCard');
   var body = document.getElementById('spiEvolutionBody');
@@ -4703,31 +4705,32 @@ function renderSpiEvolution(){
   });
 
   // gráfico: linha do SPI global (em cima) + barras da variação semana a semana (embaixo)
-  var W = 760, padL = 48, padR = 16, top = 22, h1 = 170, gap = 34, h2 = 90, bottom = 34;
+  // desenha na largura real do quadro: fontes ficam no tamanho certo (11 px) e não "incham" ao esticar
+  var W = Math.max(480, Math.round(box.clientWidth || 760)), padL = 44, padR = 12, top = 24, h1 = 190, gap = 40, h2 = 70, bottom = 30;
   var H = top + h1 + gap + h2 + bottom;
   var n = data.length;
   var step = n > 1 ? (W - padL - padR) / (n - 1) : 0;
   var xAt = function(i){ return n > 1 ? padL + i * step : padL + (W - padL - padR) / 2; };
   var vals = data.map(function(r){ return r.spi; });
   var lo = Math.min.apply(null, vals.concat([1])), hi = Math.max.apply(null, vals.concat([1]));
-  var pad = Math.max((hi - lo) * 0.15, 0.01); lo -= pad; hi += pad;
+  var stepY = (hi - lo) > 0.4 ? 0.1 : 0.05;
+  lo = Math.floor((lo - 0.01) / stepY) * stepY; hi = Math.ceil((hi + 0.01) / stepY) * stepY;
   var yAt = function(v){ return top + (hi - v) / (hi - lo) * h1; };
   var deltas = data.map(function(r){ return r.delta || 0; });
   var dmax = Math.max.apply(null, deltas.map(Math.abs).concat([0.001]));
   var y0 = top + h1 + gap + h2 / 2;
   var yD = function(d){ return y0 - d / dmax * (h2 / 2 - 4); };
-  var bw = Math.max(4, Math.min(28, (n > 1 ? step : 60) * 0.55));
+  var bw = Math.max(3, Math.min(9, (n > 1 ? step : 60) * 0.45));
   var color = { good: 'var(--status-good)', warn: 'var(--status-warning-text)', crit: 'var(--status-critical)', flat: 'var(--text-muted)' };
   var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Evolução do SPI global por semana">';
   // painel 1
   s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top - 8) + '">SPI Global</text>';
-  var ticks = 4;
-  for (var t = 0; t <= ticks; t++){
-    var v = lo + (hi - lo) * t / ticks, y = yAt(v);
-    s += '<line class="evo-axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y + '" y2="' + y + '"/>'
-      + '<text x="' + (padL - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + fmtSpi(v) + '</text>';
+  for (var v = lo; v <= hi + 1e-9; v += stepY){
+    var y = yAt(v);
+    s += '<line class="evo-axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '"/>'
+      + '<text x="' + (padL - 8) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end">' + v.toFixed(2).replace('.', ',') + '</text>';
   }
-  if (1 >= lo && 1 <= hi) s += '<line class="evo-ref" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yAt(1) + '" y2="' + yAt(1) + '"/><text x="' + (W - padR) + '" y="' + (yAt(1) - 4) + '" text-anchor="end">1,000</text>';
+  if (1 >= lo && 1 <= hi) s += '<line class="evo-ref" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yAt(1) + '" y2="' + yAt(1) + '"/><text class="evo-reflab" x="' + (W - padR) + '" y="' + (yAt(1) - 5) + '" text-anchor="end">meta 1,00</text>';
   // linha suavizada (curva monotônica, não "passa" dos pontos) + área clara abaixo
   var pts = data.map(function(r, i){ return [xAt(i), yAt(r.spi)]; });
   var path = evoSmoothPath(pts);
@@ -4736,9 +4739,7 @@ function renderSpiEvolution(){
   // painel 2
   s += '<text class="evo-panel-label" x="' + padL + '" y="' + (top + h1 + gap - 10) + '">Variação vs. semana anterior</text>';
   s += '<line class="evo-axis" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y0 + '" y2="' + y0 + '"/>';
-  s += '<text x="' + (padL - 6) + '" y="' + (yD(dmax) + 4) + '" text-anchor="end">+' + fmtSpi(dmax) + '</text>'
-    + '<text x="' + (padL - 6) + '" y="' + (y0 + 4) + '" text-anchor="end">0</text>'
-    + '<text x="' + (padL - 6) + '" y="' + (yD(-dmax) + 4) + '" text-anchor="end">−' + fmtSpi(dmax) + '</text>';
+  s += '<text x="' + (padL - 8) + '" y="' + (y0 + 3.5) + '" text-anchor="end">0</text>';
   // um grupo por semana (ponto + barra + destaque ao passar o mouse): a coluna inteira
   // da semana é área de hover, com linha-guia vertical, ponto/barra realçados e os valores.
   var colW = n > 1 ? step : (W - padL - padR);
@@ -4750,13 +4751,13 @@ function renderSpiEvolution(){
     if (r.delta !== null){
       var c = evoDeltaClass(r.delta), y = yD(r.delta);
       var yTop = Math.min(y, y0), hh = Math.max(Math.abs(y - y0), 1.5);
-      g += '<rect class="evo-bar" x="' + (x - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="2" fill="' + color[c] + '"' + (isSel ? '' : ' opacity="0.85"') + '/>';
+      g += '<rect class="evo-bar" x="' + (x - bw / 2).toFixed(1) + '" y="' + yTop.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hh.toFixed(1) + '" rx="1.5" fill="' + color[c] + '"' + (isSel ? '' : ' opacity="0.55"') + '/>';
       var ly = r.delta >= 0 ? yTop - 6 : yTop + hh + 13;
       g += '<text class="evo-hl evo-hl-bar" x="' + x.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" style="fill:' + color[c] + '">' + fmtSignedSpi(r.delta) + ' (' + fmtSignedPct(r.pct) + ')</text>';
     }
     if (isSel) g += '<circle class="evo-sel-ring" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="7"/>';
     g += '<circle class="evo-hl-ring" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="9" style="stroke:' + color[statusOf(r.spi)] + '"/>';
-    g += '<circle class="evo-dot' + (isSel ? ' sel' : '') + '" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="' + (isSel ? 3.5 : 3) + '" fill="' + color[statusOf(r.spi)] + '"/>';
+    g += '<circle class="evo-dot' + (isSel ? ' sel' : '') + '" cx="' + x.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="' + (isSel ? 3.5 : 2.4) + '" fill="' + color[statusOf(r.spi)] + '"/>';
     var anc = n > 1 && i === 0 ? 'start' : (n > 1 && i === n - 1 ? 'end' : 'middle');
     g += '<text class="evo-hl evo-hl-spi" x="' + x.toFixed(1) + '" y="' + (py - 14).toFixed(1) + '" text-anchor="' + anc + '" style="fill:' + color[statusOf(r.spi)] + '">' + fmtSpi(r.spi) + '</text>';
     g += '<text class="evo-hl evo-hl-date" x="' + x.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(r.ref) + '</text>';
@@ -4765,12 +4766,13 @@ function renderSpiEvolution(){
     s += g;
   });
   // eixo x (semanas) — rótulos espaçados para não sobrepor
-  var every = Math.max(1, Math.ceil(n / 9));
+  var every = Math.max(1, Math.ceil(n / Math.max(4, Math.floor((W - padL - padR) / 95))));
+  var shortRef = function(s){ return String(s || '').replace(/^(\d{2}\/\d{2}\/)\d{2}(\d{2})$/, '$1$2'); };
   data.forEach(function(r, i){
     if (i !== n - 1 && (i % every || n - 1 - i < every)) return;
     var anc = n > 1 && i === 0 ? 'start' : (n > 1 && i === n - 1 ? 'end' : 'middle');
     var xx = anc === 'start' ? xAt(i) - 4 : (anc === 'end' ? xAt(i) + 4 : xAt(i));
-    s += '<text class="evo-xlab" x="' + xx.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(r.ref) + '</text>';
+    s += '<text class="evo-xlab" x="' + xx.toFixed(1) + '" y="' + (H - bottom + 18) + '" text-anchor="' + anc + '">' + escapeHtmlEvo(shortRef(r.ref)) + '</text>';
   });
   s += '</svg>';
   box.innerHTML = s;
