@@ -888,7 +888,8 @@ function buildEmailChartSvg(project, opts){
   var svgNS = 'http://www.w3.org/2000/svg';
   var pad = 24, headerH = 78;
   var totalW = W + pad * 2;
-  var totalH = H + headerH + pad * 2;
+  var extraB = 10; // espaço a mais embaixo: datas inclinadas (fonte 10) não encostam no título do eixo
+  var totalH = H + headerH + pad * 2 + extraB;
   var fontFamily = 'system-ui, -apple-system, "Segoe UI", sans-serif';
 
   // cores resolvidas do tema atual (claro/escuro) — precisam ser valores
@@ -999,7 +1000,7 @@ function buildEmailChartSvg(project, opts){
   var lbl2 = node('text', { x: tp2.x, y: tp2.y, 'text-anchor': tp2.anchor, 'font-family': fontFamily, 'font-size': 10, 'font-weight': 500, fill: c.textSecondary }, g);
   lbl2.textContent = TARGET_TEXTS[0.85];
 
-  var xt2 = node('text', { x: M.left + plotW / 2, y: H - 6, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted }, g);
+  var xt2 = node('text', { x: M.left + plotW / 2, y: H - 6 + extraB, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted }, g);
   xt2.textContent = 'Data de referência';
   var yt2 = node('text', { x: -(M.top + plotH / 2), y: 16, 'text-anchor': 'middle', 'font-family': fontFamily, 'font-size': 11, fill: c.textMuted,
     transform: 'rotate(-90)' }, g);
