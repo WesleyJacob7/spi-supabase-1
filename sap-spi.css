@@ -267,3 +267,14 @@ html[data-theme="dark"] #companyPills .pill[aria-pressed="true"], html[data-them
 :root[data-co][data-theme="light"] thead th{ background:var(--brand-tint) !important; }
 :root[data-co][data-theme="light"] tbody tr:hover td{ background:var(--brand-soft); }
 :root[data-co][data-theme="light"] a:not(.btn){ color:var(--brand-ac); }
+
+/* tabela da Evolução do SPI Global no mesmo visual leve do gráfico */
+.spi-evo-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.spi-evo-table thead th{ background:transparent !important; font-size:10.5px !important; font-weight:500 !important; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted) !important; padding:8px 12px !important; border-bottom:1px solid var(--hairline, #e3e7ec) !important; position:sticky; top:0; background-color:var(--surface-1, #fff) !important; }
+.spi-evo-table tbody td{ padding:7px 12px !important; border-bottom:1px solid #f0f2f5 !important; color:var(--text-secondary); font-weight:400 !important; font-variant-numeric:tabular-nums; }
+.spi-evo-table tbody tr:hover td, .spi-evo-table tbody tr.hl td{ background:var(--brand-soft, #f7f9fb) !important; }
+.spi-evo-table tbody tr.sel td{ background:transparent !important; font-weight:400 !important; }
+.spi-evo-table tbody tr.sel td:first-child{ box-shadow:inset 3px 0 0 var(--brand-ac, var(--accent)); color:var(--text-primary); }
+.spi-evo-table .bd-val, .spi-evo-table .evo-delta{ font-weight:500 !important; }
+.spi-evo-table .evo-delta{ font-size:12px; }
+.spi-evo-table td:last-child .evo-delta{ opacity:.8; }
