@@ -4341,7 +4341,6 @@ function impactSummaryText(r){
   t.push('Somando os projetos, os términos empurraram ' + impactDays(r.slipDays) + ' dias (' + r.slipCount + ' projeto' + (r.slipCount === 1 ? '' : 's') + ')'
     + (r.recCount ? ' e ' + r.recCount + ' projeto' + (r.recCount === 1 ? ' recuperou ' : 's recuperaram ') + impactNum(-r.recDays, Math.abs(r.recDays) % 1 ? 1 : 0) + ' dias' : ' e nenhum projeto recuperou prazo')
     + ', saldo de ' + impactDays(net) + ' dias na semana.');
-  t.push('Como o SPI Global é Σ baseline ÷ Σ duração do schedule, cada dia de deslocamento pesa igual, seja num projeto grande ou pequeno.');
   if (r.bandChanges && r.bandChanges.length){
     var nW = r.bandChanges.filter(function(i){ return i.bandDir > 0; }).length, nB = r.bandChanges.length - nW;
     var toCrit = r.bandChanges.filter(function(i){ return i.bandTo === 'crit'; }).map(function(i){ return i.project; });
