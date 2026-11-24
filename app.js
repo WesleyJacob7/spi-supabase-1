@@ -4513,12 +4513,14 @@ function openImpactReport(){
   renderImpactReport();
   var ov = document.getElementById('impactOverlay');
   if (ov){ ov.hidden = false; document.body.classList.add('impact-open'); }
+  try { applyBrand(); } catch (e){}
   var sc = document.querySelector('#impactOverlay .impact-scroll'); if (sc) sc.scrollTop = 0;
 }
 function closeImpactReport(){
   var ov = document.getElementById('impactOverlay');
   if (ov) ov.hidden = true;
   document.body.classList.remove('impact-open');
+  try { applyBrand(); } catch (e){}
 }
 function printImpactReport(){
   var oldTitle = document.title;
@@ -4541,6 +4543,7 @@ function initImpactReport(){
     impactState.company = b.getAttribute('data-company');
     [].forEach.call(this.querySelectorAll('button'), function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
     renderImpactReport();
+    try { applyBrand(); } catch (e){}
   });
   document.addEventListener('keydown', function(e){
     var ov = document.getElementById('impactOverlay');
@@ -4831,7 +4834,9 @@ var BRAND = { JKA: ['JKA', 'CONSTRUCTION INC.', 'brand/jka-simbolo-branco.png'],
 var shellTxt0 = null;
 function applyBrand(){
   var co = currentUserCompanyScope || null;
-  if (!co && emailsView()) co = emailsCo || null;
+  var impOv = document.getElementById('impactOverlay');
+  if (!co && impOv && !impOv.hidden) co = (impactState && impactState.company !== 'Geral') ? impactState.company : null;   // Análise de impacto: cor da empresa escolhida no próprio relatório
+  else if (!co && emailsView()) co = emailsCo || null;
   else if (!co && state.companies && state.companies.size === 1){
     var all = {}; (DATA || []).forEach(function(d){ if (d && d.company) all[d.company] = 1; });
     if (Object.keys(all).length > 1) co = Array.from(state.companies)[0];
