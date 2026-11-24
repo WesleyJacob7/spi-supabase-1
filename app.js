@@ -1094,9 +1094,9 @@ function projectCompany(project){
   for (var i = 0; i < DATA.length; i++){ if (DATA[i].project === project && DATA[i].company) return DATA[i].company; }
   return '';
 }
-// Largura com que a imagem aparece no e-mail (px); o PNG é gerado em 3x para
+// Largura com que a imagem aparece no e-mail (px); o PNG é gerado em 4x para
 // ficar nítido, e o HTML copiado junto diz ao Outlook o tamanho de exibição.
-var EMAIL_CHART_DISPLAY_W = 900, EMAIL_CHART_SCALE = 3;
+var EMAIL_CHART_DISPLAY_W = 760, EMAIL_CHART_SCALE = 4;
 function copyProjectChartToClipboard(project){
   if (!navigator.clipboard || typeof window.ClipboardItem !== 'function'){
     return Promise.resolve(false);
