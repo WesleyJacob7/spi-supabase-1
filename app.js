@@ -954,9 +954,9 @@ function buildEmailChartSvg(project){
 
   node('rect', { x: M.left, y: tScale(trendMax), width: plotW, height: tScale(1) - tScale(trendMax), fill: c.goodWash }, g);
   node('rect', { x: M.left, y: tScale(1), width: plotW, height: tScale(0.85) - tScale(1), fill: c.warnWash }, g);
-  node('rect', { x: M.left, y: tScale(0.85), width: plotW, height: tScale(trendMin) - tScale(0.85), fill: c.critWash }, g);
+  node('rect', { x: M.left, y: tScale(0.85), width: plotW, height: tScale(yMin) - tScale(0.85), fill: c.critWash }, g);
 
-  for (var yi = 0, yv = trendMin; yv <= trendMax + 0.0001; yi++, yv = Math.round((trendMin + yi * trendStep) * 100) / 100){
+  for (var yv = yMin; yv <= trendMax + 0.0001; yv += 0.1){
     var gy = tScale(yv);
     node('line', { x1: M.left, x2: M.left + plotW, y1: gy, y2: gy, stroke: c.hairline, 'stroke-width': 1 }, g);
     var t2 = node('text', { x: M.left - 10, y: gy + 3.5, 'text-anchor': 'end', 'font-family': fontFamily, 'font-size': 9, fill: c.textMuted }, g);
@@ -996,14 +996,14 @@ function buildEmailChartSvg(project){
 
   if (trendRows.length){
     var pointsStr = trendRows.map(function(d, i){
-      return trendXScale(i, trendRows.length) + ',' + tScale(Math.min(Math.max(d.spi, trendMin), trendMax));
+      return trendXScale(i, trendRows.length) + ',' + tScale(Math.min(Math.max(d.spi, yMin), trendMax));
     }).join(' ');
     node('polyline', { points: pointsStr, fill: 'none', stroke: c.textSecondary, 'stroke-width': 2, opacity: 0.55 }, g);
 
     var showLbl = trendLabelIdx(trendRows);
     trendRows.forEach(function(d, i){
       var cx = trendXScale(i, trendRows.length);
-      var cy = tScale(Math.min(Math.max(d.spi, trendMin), trendMax));
+      var cy = tScale(Math.min(Math.max(d.spi, yMin), trendMax));
       var st = statusOf(d.spi);
       var color = st === 'good' ? c.good : st === 'warn' ? c.warnMark : c.crit;
       node('circle', { cx: cx, cy: cy, r: 5, fill: color, stroke: c.bg, 'stroke-width': 2 }, g);
@@ -2688,22 +2688,8 @@ function yScale(spi){ return M.top + (yMax - spi) / (yMax - yMin) * plotH; }
 // histórico de um projeto: o topo do eixo sobe quando o SPI passa de 1,10 (ex.: 1,488), para o ponto e o número
 // não ficarem presos no topo do gráfico, encavalados com a legenda
 var trendMax = yMax;
-// Escala do histórico acompanha os valores do projeto: com SPI todos perto de
-// 1,00 (ex.: projeto novo, poucas semanas) o eixo começa em 0,80 em vez de 0,30,
-// para a variação aparecer; a faixa 0,85 continua sempre visível. Também define
-// trendMin e o passo das marcas (trendStep) — chamada antes de cada desenho.
-var trendMin = yMin, trendStep = 0.1;
-function trendYMax(rows){
-  var mx = 0, mn = Infinity;
-  (rows || []).forEach(function(d){ if (d.spi > mx) mx = d.spi; if (d.spi < mn) mn = d.spi; });
-  if (!isFinite(mn)) mn = 1;
-  trendMin = Math.max(yMin, Math.min(0.80, Math.floor((mn - 0.05) * 10) / 10));
-  var range = Math.max(1, mx) - trendMin;
-  trendStep = range <= 0.4 ? 0.05 : 0.1;
-  var top = trendStep === 0.05 ? Math.max(1.05, Math.ceil((mx + 0.03) * 20) / 20) : Math.max(yMax, Math.ceil((mx + 0.06) * 10) / 10);
-  return Math.round(top * 100) / 100;
-}
-function tScale(spi){ return M.top + (trendMax - spi) / (trendMax - trendMin) * plotH; }
+function trendYMax(rows){ var mx = 0; (rows || []).forEach(function(d){ if (d.spi > mx) mx = d.spi; }); return Math.max(yMax, Math.ceil((mx + 0.06) * 10) / 10); }
+function tScale(spi){ return M.top + (trendMax - spi) / (trendMax - yMin) * plotH; }
 // rótulos das linhas de meta (1,00 e 0,85): ficam no ponto da linha onde não há pontos do gráfico
 // (direita, esquerda ou meio), para os números do SPI não ficarem por cima deles
 var TARGET_TEXTS = { 1: 'Meta / limite bom (SPI = 1,00)', 0.85: 'Limite atenção / crítico (0,85)' };
@@ -2715,7 +2701,7 @@ function targetLabelPos(rows, val){
             { x: M.left + plotW / 2, anchor: 'middle', l: M.left + plotW / 2 - w / 2, r: M.left + plotW / 2 + w / 2 }];
   var cands = [];
   [[top, bot, ty - 6], [ty + 7, ty + 18, ty + 16]].forEach(function(v){ xs.forEach(function(c){ cands.push({ x: c.x, anchor: c.anchor, l: c.l, r: c.r, t: v[0], b: v[1], y: v[2] }); }); });
-  var free = function(cd){ for (var i = 0; i < n; i++){ var x = trendXScale(i, n), y = tScale(Math.min(Math.max(rows[i].spi, trendMin), trendMax));
+  var free = function(cd){ for (var i = 0; i < n; i++){ var x = trendXScale(i, n), y = tScale(Math.min(Math.max(rows[i].spi, yMin), trendMax));
     if (x > cd.l - 7 && x < cd.r + 7 && y > cd.t - 5 && y < cd.b + 5) return false; } return true; };
   var c = cands.find(free) || cands[0];
   return { x: c.x, y: c.y, anchor: c.anchor, box: { l: c.l, r: c.r, t: c.t, b: c.b } };
@@ -2726,7 +2712,7 @@ function targetLabelPos(rows, val){
 function trendLabelIdx(rows){
   var n = rows.length, keep = {};
   if (!n) return keep;
-  var pts = rows.map(function(d, i){ return { x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, trendMin), trendMax)) }; });
+  var pts = rows.map(function(d, i){ return { x: trendXScale(i, n), y: tScale(Math.min(Math.max(d.spi, yMin), trendMax)) }; });
   var boxes = [1, 0.85].map(function(v){ return targetLabelPos(rows, v).box; });
   var W0 = 26, H0 = 10;
   var lines = [1, 0.85].map(function(v){ return tScale(v); });
@@ -2837,9 +2823,9 @@ function buildTrendStaticChart(rows){
 
   el('rect', { x: M.left, y: tScale(trendMax), width: plotW, height: tScale(1) - tScale(trendMax), class: 'band-good' }, svg);
   el('rect', { x: M.left, y: tScale(1), width: plotW, height: tScale(0.85) - tScale(1), class: 'band-warn' }, svg);
-  el('rect', { x: M.left, y: tScale(0.85), width: plotW, height: tScale(trendMin) - tScale(0.85), class: 'band-crit' }, svg);
+  el('rect', { x: M.left, y: tScale(0.85), width: plotW, height: tScale(yMin) - tScale(0.85), class: 'band-crit' }, svg);
 
-  for (var yi = 0, yv = trendMin; yv <= trendMax + 0.0001; yi++, yv = Math.round((trendMin + yi * trendStep) * 100) / 100){
+  for (var yv = yMin; yv <= trendMax + 0.0001; yv += 0.1){
     var gy = tScale(yv);
     el('line', { x1: M.left, x2: M.left + plotW, y1: gy, y2: gy, class: 'gridline' }, svg);
     var t = el('text', { x: M.left - 10, y: gy + 3.5, class: 'tick-label', 'text-anchor': 'end' }, svg);
@@ -2885,14 +2871,14 @@ function drawTrendSeries(rows){
   var svg = document.getElementById('chart');
   if (!svg || !rows.length) return;
   var pointsStr = rows.map(function(d, i){
-    return trendXScale(i, rows.length) + ',' + tScale(Math.min(Math.max(d.spi, trendMin), trendMax));
+    return trendXScale(i, rows.length) + ',' + tScale(Math.min(Math.max(d.spi, yMin), trendMax));
   }).join(' ');
   el('polyline', { points: pointsStr, class: 'trend-line' }, svg);
 
   var showLbl = trendLabelIdx(rows);
   rows.forEach(function(d, i){
     var cx = trendXScale(i, rows.length);
-    var cy = tScale(Math.min(Math.max(d.spi, trendMin), trendMax));
+    var cy = tScale(Math.min(Math.max(d.spi, yMin), trendMax));
     var color = STATUS_COLOR[statusOf(d.spi)];
 
     var hit = el('circle', { class: 'dot-hit', cx: cx, cy: cy, r: 13, tabindex: '0', role: 'img',
