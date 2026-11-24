@@ -1078,19 +1078,9 @@ var EMAIL_LOGOS = {};
     } catch (e){}
   });
 })();
-// Estilo do gráfico do e-mail: projetos que já recebiam o e-mail de SPI antes
-// de 24/11/2026 continuam no modo escuro (para o histórico de e-mails não
-// mudar de cara); projetos novos (primeiro e-mail a partir dessa data, ou
-// nunca enviado) saem no modo claro com a logo da empresa no fundo.
-var EMAIL_LIGHT_SINCE = new Date('2026-11-24T00:00:00-03:00');
-function emailChartStyle(project){
-  var s = pmEmailLogSummary && pmEmailLogSummary[project];
-  var first = s && s.firstEmailSent ? new Date(s.firstEmailSent) : null;
-  DATA.forEach(function(d){
-    if (d.project === project && d.email_sent_at){ var t = new Date(d.email_sent_at); if (!first || t < first) first = t; }
-  });
-  return (first && first < EMAIL_LIGHT_SINCE) ? 'dark' : 'light';
-}
+// Estilo do gráfico do e-mail: todos no modo claro, com a logo da empresa no
+// fundo (igual aos sites). Antes de 24/11/2026 os e-mails saíam no escuro.
+function emailChartStyle(project){ return 'light'; }
 function projectCompany(project){
   for (var i = 0; i < DATA.length; i++){ if (DATA[i].project === project && DATA[i].company) return DATA[i].company; }
   return '';
