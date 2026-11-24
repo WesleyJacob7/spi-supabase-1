@@ -4927,7 +4927,7 @@ function render(){
 
   renderBandBreakdown(rows);
   renderCompanyBreakdown(rows);
-  renderSpiEvolution();
+  try { renderSpiEvolution(); } catch (e){ console.warn("Evolução do SPI", e); }
 
   var chartRows = state.isolatedProject
     ? rows.filter(function(d){ return d.project === state.isolatedProject; })
