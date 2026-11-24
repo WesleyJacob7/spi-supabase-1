@@ -195,8 +195,8 @@ select.wk, textarea.reply-input, .login-field select, .login-field input,
 :root[data-theme="light"] .filters{ border-top:1px solid #e3e7ec !important; border-bottom:1px solid #e3e7ec !important; padding-left:0 !important; padding-right:0 !important; }
 :root[data-theme="light"] .kpi{ border-left:3px solid var(--brand-ac, #5b738b) !important; padding-left:14px !important; }
 :root[data-theme="light"] .shellbar{ background:var(--brand-shell, #354a5f); }
-:root[data-co="JKA"]{ --brand-shell:#0a4f96; --brand-ac:#0a6ed1; }
-:root[data-co="Prestige"]{ --brand-shell:#8f4300; --brand-ac:#b85500; }
+:root[data-co="JKA"]{ --brand-shell:#2a306e; --brand-ac:#2a306e; }
+:root[data-co="Prestige"]{ --brand-shell:#dc7437; --brand-ac:#dc7437; }
 :root[data-co] .shellbar{ background:var(--brand-shell) !important; }
 .shellbar .sb-title{ display:flex; align-items:center; white-space:nowrap; }
 .shellbar .sb-mark{ height:24px; width:auto; margin-right:10px; }
@@ -257,3 +257,13 @@ html[data-theme="dark"] #companyPills .pill[aria-pressed="true"], html[data-them
 /* botão Entrar neutro (cinza-azulado da barra do topo), igual ao site dos dossiês */
 .login-card .btn.primary{ background:#354a5f !important; border-color:#354a5f !important; color:#fff !important; }
 .login-card .btn.primary:hover:not(:disabled){ background:#2b3d4f !important; border-color:#2b3d4f !important; }
+
+/* cores das empresas no tom exato das logos (igual ao site dos dossiês): Prestige #dc7437, JKA #2a306e
+   — barra do topo, botões, destaques, foco e fundo claro dos cabeçalhos de tabela */
+:root[data-co="JKA"][data-theme="light"]{ --accent:#2a306e; --focus-ring:#2a306e; --sap-accent-hover:#1f2457; --brand-tint:#e8eaf4; --brand-soft:#f8f8fc; }
+:root[data-co="Prestige"][data-theme="light"]{ --accent:#dc7437; --focus-ring:#dc7437; --sap-accent-hover:#c5622a; --brand-tint:#fbeadf; --brand-soft:#fffaf7; }
+:root[data-co][data-theme="light"] .btn.primary, :root[data-co][data-theme="light"] button.primary{ background:var(--brand-ac) !important; border-color:var(--brand-ac) !important; color:#fff !important; }
+:root[data-co][data-theme="light"] .btn.primary:hover:not(:disabled){ background:var(--sap-accent-hover) !important; border-color:var(--sap-accent-hover) !important; }
+:root[data-co][data-theme="light"] thead th{ background:var(--brand-tint) !important; }
+:root[data-co][data-theme="light"] tbody tr:hover td{ background:var(--brand-soft); }
+:root[data-co][data-theme="light"] a:not(.btn){ color:var(--brand-ac); }
